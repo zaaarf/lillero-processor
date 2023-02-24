@@ -5,6 +5,7 @@ import ftbsc.lll.IInjector;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.tools.DescriptorBuilder;
+import ftbsc.lll.tools.SrgMapper;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -15,14 +16,14 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Target;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,8 +32,17 @@ import java.util.Set;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class LilleroProcessor extends AbstractProcessor {
 
-	Types types = processingEnv.getTypeUtils();
-	Elements elements = processingEnv.getElementUtils();
+	private SrgMapper mapper;
+
+	@Override
+	public void init(ProcessingEnvironment processingEnv) {
+		try {
+			mapper = new SrgMapper(Files.lines(Paths.get("build/createMcpToSrg/output.tsrg")));
+		} catch(IOException e) {
+			throw new RuntimeException(e);
+		}
+		super.init(processingEnv);
+	}
 
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -54,12 +64,12 @@ public class LilleroProcessor extends AbstractProcessor {
 		return true;
 	}
 
-	/** TODO: fancy class object ref in javadoc
+	/**
 	 * This checks whether a given class contains the requirements to be parsed into a Lillero injector.
-	 * It must have at least one method annotated with @Target, and one method annotated with @Injector
-	 * that must be public, static and take in a ClassNode and a MethodNode.
+	 * It must have at least one method annotated with {@link Target}, and one method annotated with {@link Injector}
+	 * that must be public, static and take in a {@link ClassNode} and a {@link MethodNode}.
 	 * @param elem the element to check.
-	 * @return whether it can be converted into a valid IInjector.
+	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
 	private boolean isValidInjector(TypeElement elem) {
 		TypeMirror classNodeType = processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
@@ -99,7 +109,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		return sb.toString();
 	}
 
-	private String getSrgName(MethodSpec m) {
+	private String getSrgElementName(MethodSpec m) {
 		return m.name; //TODO;
 	}
 
@@ -137,7 +147,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		MethodSpec methodName = MethodSpec.methodBuilder("methodName")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addStatement("return $S", getSrgName(targetMethod))
+			.addStatement("return $S", getSrgElementName(targetMethod))
 			.build();
 
 		MethodSpec methodDesc = MethodSpec.methodBuilder("methodDesc")
