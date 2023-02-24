@@ -1,0 +1,29 @@
+import org.gradle.internal.jvm.Jvm
+
+plugins {
+    id 'java-processor-plugin'
+}
+
+group 'ftbsc.lll.processor'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.fantabos.co' }
+}
+
+dependencies {
+    implementation files(Jvm.current().toolsJar)
+    implementation 'com.squareup:javapoet:1.13.0'
+    implementation 'ftbsc:lll:0.1.2'
+    implementation 'org.ow2.asm:asm-commons:9.4'
+}
+
+gradlePlugin {
+    plugins {
+        create("lillero-processor") {
+            id = "ftbsc.lll.processor"
+            implementationClass = "ftbsc.lll.processor.Plugin"
+        }
+    }
+}
