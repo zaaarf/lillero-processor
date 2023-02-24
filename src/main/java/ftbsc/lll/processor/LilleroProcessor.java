@@ -6,6 +6,7 @@ import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.tools.DescriptorBuilder;
 import ftbsc.lll.tools.SrgMapper;
+import org.gradle.internal.impldep.org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -17,7 +18,9 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
@@ -109,7 +112,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		return sb.toString();
 	}
 
-	private String getSrgElementName(MethodSpec m) {
+	private String getSrgMethodName(MethodSpec m) {
 		return m.name; //TODO;
 	}
 
@@ -141,13 +144,13 @@ public class LilleroProcessor extends AbstractProcessor {
 		MethodSpec targetClass = MethodSpec.methodBuilder("targetClass")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addStatement("return $S", ann.value().getName())
+			.addStatement("return $S", mapper.getMcpClass(Type.getInternalName(ann.value())))
 			.build();
 
 		MethodSpec methodName = MethodSpec.methodBuilder("methodName")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addStatement("return $S", getSrgElementName(targetMethod))
+			.addStatement("return $S", getSrgMethodName(targetMethod))
 			.build();
 
 		MethodSpec methodDesc = MethodSpec.methodBuilder("methodDesc")
@@ -176,15 +179,20 @@ public class LilleroProcessor extends AbstractProcessor {
 			.build();
 
 		try {
-			JavaFileObject builderFile = processingEnv.getFiler().createSourceFile(injectorClassName);
-			PrintWriter out = new PrintWriter(builderFile.openWriter());
-
+			JavaFileObject injectorFile = processingEnv.getFiler().createSourceFile(injectorClassName);
+			PrintWriter out = new PrintWriter(injectorFile.openWriter());
 			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
 			javaFile.writeTo(out);
+			out.close();
 		} catch(IOException e) {}
 	}
 
 	private void generateServiceProvider(Set<TypeElement> inj) {
-		//todo generate the services file
+		try {
+			FileObject serviceProvider = processingEnv.getFiler().createResource(StandardLocation.SOURCE_OUTPUT, "", "ftbsc.lll.IInjector");
+			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
+			inj.forEach(i -> out.println(i.getQualifiedName() + "Injector"));
+			out.close();
+		} catch(IOException e) {}
 	}
 }
