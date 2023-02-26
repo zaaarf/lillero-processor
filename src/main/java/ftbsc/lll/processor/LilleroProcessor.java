@@ -279,7 +279,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	private void generateServiceProvider(Set<TypeElement> inj) {
 		try {
-			FileObject serviceProvider = processingEnv.getFiler().createResource(StandardLocation.SOURCE_OUTPUT, "", "ftbsc.lll.IInjector");
+			FileObject serviceProvider = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", "ftbsc.lll.IInjector");
 			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
 			inj.forEach(i -> out.println(i.getQualifiedName() + "Injector"));
 			out.close();

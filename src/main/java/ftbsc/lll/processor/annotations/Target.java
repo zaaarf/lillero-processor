@@ -13,6 +13,6 @@ import java.lang.annotation.RetentionPolicy;
  * @see Patch
  * @see Injector
  */
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface Target {}

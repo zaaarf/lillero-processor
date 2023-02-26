@@ -11,7 +11,7 @@ import java.lang.annotation.RetentionPolicy;
  * @see Target
  * @see Injector
  */
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.TYPE)
 public @interface Patch {
 	/**

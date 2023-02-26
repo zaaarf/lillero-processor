@@ -16,6 +16,6 @@ import org.objectweb.asm.tree.MethodNode;
  * @see Patch
  * @see Target
  */
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface Injector {}

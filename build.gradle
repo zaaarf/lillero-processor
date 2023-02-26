@@ -1,5 +1,5 @@
 plugins {
-    id 'java-gradle-plugin'
+    id 'java'
 }
 
 group 'ftbsc.lll.processor'
@@ -13,13 +13,4 @@ dependencies {
     implementation 'com.squareup:javapoet:1.13.0'
     implementation 'ftbsc:lll:0.2.0'
     implementation 'org.ow2.asm:asm-commons:9.4' //just for the javadocs
-}
-
-gradlePlugin {
-    plugins {
-        create("lillero-processor") {
-            id = "ftbsc.lll.processor"
-            implementationClass = "ftbsc.lll.processor.Plugin"
-        }
-    }
 }
