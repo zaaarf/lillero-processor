@@ -6,10 +6,6 @@ import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.tools.DescriptorBuilder;
 import ftbsc.lll.tools.SrgMapper;
-import org.gradle.internal.impldep.org.objectweb.asm.Type;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
-
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.ExecutableElement;
@@ -70,7 +66,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * This checks whether a given class contains the requirements to be parsed into a Lillero injector.
 	 * It must have at least one method annotated with {@link Target}, and one method annotated with {@link Injector}
-	 * that must be public, static and take in a {@link ClassNode} and a {@link MethodNode}.
+	 * that must be public, static and take in a ClassNode and a MethodNode from the ObjectWeb library.
 	 * @param elem the element to check.
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
@@ -89,7 +85,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		});
 	}
 
-	private MethodSpec findAnnotatedMethod(TypeElement cl, Class<? extends Annotation> ann) {
+	private static MethodSpec findAnnotatedMethod(TypeElement cl, Class<? extends Annotation> ann) {
 		return MethodSpec.overriding(
 			(ExecutableElement) cl.getEnclosedElements()
 				.stream()
@@ -99,21 +95,49 @@ public class LilleroProcessor extends AbstractProcessor {
 		).build();
 	}
 
-	private String getClassOrString(TypeName n) { //jank but fuck you
+	private static String getClassOrString(TypeName n) { //jank but fuck you
 		return n.isPrimitive() ? n + ".class" : "\"" + n + "\"";
 	}
 
-	private String generateDescriptorBuilderString(MethodSpec m) {
-		StringBuilder sb = new StringBuilder();
-		sb.append("new $T().setReturnType(");
-		sb.append(getClassOrString(m.returnType)).append(")");
-		m.parameters.forEach(p -> sb.append(".addParameter(").append(getClassOrString(p.type)).append(")"));
-		sb.append(".build();");
-		return sb.toString();
+	private static String descriptorFromType(TypeName type) {
+		StringBuilder desc = new StringBuilder();
+		//add array brackets
+		while(type instanceof ArrayTypeName) {
+			desc.append("[");
+			type = ((ArrayTypeName) type).componentType;
+		}
+		if(type instanceof ClassName) { //todo maybe?
+			ClassName var = (ClassName) type;
+			desc.append(DescriptorBuilder.nameToDescriptor(var.canonicalName(), 0));
+			desc.append(";");
+		} else {
+			if(TypeName.BOOLEAN.equals(type))
+				desc.append("Z");
+			else if(TypeName.CHAR.equals(type))
+				desc.append("C");
+			else if(TypeName.BYTE.equals(type))
+				desc.append("B");
+			else if(TypeName.SHORT.equals(type))
+				desc.append("S");
+			else if(TypeName.INT.equals(type))
+				desc.append("I");
+			else if(TypeName.FLOAT.equals(type))
+				desc.append("F");
+			else if(TypeName.LONG.equals(type))
+				desc.append("J");
+			else if(TypeName.DOUBLE.equals(type))
+				desc.append("D");
+		}
+		return desc.toString();
 	}
 
-	private String getSrgMethodName(MethodSpec m) {
-		return m.name; //TODO;
+	public static String descriptorFromMethodSpec(MethodSpec m) {
+		StringBuilder methodSignature = new StringBuilder();
+		methodSignature.append("(");
+		m.parameters.forEach(p -> methodSignature.append(descriptorFromType(p.type)));
+		methodSignature.append(")");
+		methodSignature.append(descriptorFromType(m.returnType));
+		return methodSignature.toString();
 	}
 
 	private void generateInjector(TypeElement cl) {
@@ -144,26 +168,29 @@ public class LilleroProcessor extends AbstractProcessor {
 		MethodSpec targetClass = MethodSpec.methodBuilder("targetClass")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addStatement("return $S", mapper.getMcpClass(Type.getInternalName(ann.value())))
+			.addStatement("return $S", mapper.getMcpClass(ClassName.get(ann.value()).canonicalName().replace('.', '/')))
 			.build();
+
+		String targetMethodDescriptor = descriptorFromMethodSpec(targetMethod);
 
 		MethodSpec methodName = MethodSpec.methodBuilder("methodName")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addStatement("return $S", getSrgMethodName(targetMethod))
-			.build();
+			.addStatement("return $S", mapper.getSrgMember(
+				ann.value().getName(), targetMethod.name + " " + targetMethodDescriptor)
+			).build();
 
 		MethodSpec methodDesc = MethodSpec.methodBuilder("methodDesc")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(String.class)
-			.addCode(generateDescriptorBuilderString(targetMethod), DescriptorBuilder.class)
+			.addCode("return $S", targetMethodDescriptor)
 			.build();
 
 		MethodSpec inject = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(void.class)
-			.addParameter(ParameterSpec.builder(ClassNode.class, "clazz").build())
-			.addParameter(ParameterSpec.builder(MethodNode.class, "main").build())
+			.addParameter(ParameterSpec.builder((TypeName) processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType(), "clazz").build())
+			.addParameter(ParameterSpec.builder((TypeName) processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType(), "main").build())
 			.addStatement("$S.$S(clazz, main)", className, injectorMethod.name)
 			.build();
 
@@ -184,7 +211,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
 			javaFile.writeTo(out);
 			out.close();
-		} catch(IOException e) {}
+		} catch(IOException e) {} //todo
 	}
 
 	private void generateServiceProvider(Set<TypeElement> inj) {
@@ -193,6 +220,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
 			inj.forEach(i -> out.println(i.getQualifiedName() + "Injector"));
 			out.close();
-		} catch(IOException e) {}
+		} catch(IOException e) {} //todo
 	}
 }
