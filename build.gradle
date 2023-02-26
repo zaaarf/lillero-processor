@@ -1,11 +1,8 @@
-import org.gradle.internal.jvm.Jvm
-
 plugins {
     id 'java-gradle-plugin'
 }
 
 group 'ftbsc.lll.processor'
-version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -13,10 +10,9 @@ repositories {
 }
 
 dependencies {
-    implementation files(Jvm.current().toolsJar)
     implementation 'com.squareup:javapoet:1.13.0'
     implementation 'ftbsc:lll:0.2.0'
-    implementation 'org.ow2.asm:asm-commons:9.4'
+    implementation 'org.ow2.asm:asm-commons:9.4' //just for the javadocs
 }
 
 gradlePlugin {
