@@ -20,7 +20,7 @@ import ftbsc.lll.processor.annotations.*;
 @Patch(value = Minecraft.class, reason = "crash the game as soon as it loads")
 public class SamplePatch implements Opcodes {
 	@Target
-	public void tick() {};
+	public void tick() {}; //stub representing the target method, its modifiers are irrelevant
 	@Injector
 	public static void yourCustomInjector(ClassNode clazz, MethodNode main) {
 		InsnList insnList = new InsnList();
