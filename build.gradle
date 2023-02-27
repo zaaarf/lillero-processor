@@ -3,14 +3,17 @@ plugins {
 }
 
 group 'ftbsc.lll.processor'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 repositories {
     mavenCentral()
     maven { url = 'https://maven.fantabos.co' }
 }
 
+ //TODO: figure out how to make annotationProcessor inherit its dependencies
 dependencies {
     implementation 'com.squareup:javapoet:1.13.0'
-    implementation 'ftbsc:lll:0.2.0'
-    implementation 'org.ow2.asm:asm-commons:9.4' //just for the javadocs
+    implementation 'ftbsc:lll:0.2.1'
+    implementation 'org.ow2.asm:asm-commons:9.4'
 }
