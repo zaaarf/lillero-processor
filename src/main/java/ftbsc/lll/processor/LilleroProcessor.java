@@ -9,8 +9,6 @@ import ftbsc.lll.processor.exceptions.MappingNotFoundException;
 import ftbsc.lll.processor.exceptions.MappingsFileNotFoundException;
 import ftbsc.lll.tools.DescriptorBuilder;
 import ftbsc.lll.tools.SrgMapper;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -79,7 +77,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * This checks whether a given class contains the requirements to be parsed into a Lillero injector.
 	 * It must have at least one method annotated with {@link Target}, and one method annotated with {@link Injector}
-	 * that must be public, static and take in a {@link ClassNode} and a {@link MethodNode}.
+	 * that must be public, static and take in a ClassNode and MethodNode from ObjectWeb's ASM library.
 	 * @param elem the element to check.
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
@@ -122,6 +120,12 @@ public class LilleroProcessor extends AbstractProcessor {
 			.get(); //will never be null so can ignore warning
 	}
 
+	/**
+	 * Builds a {@link MethodSpec} for a public method whose body simply returns a {@link String}.
+	 * @param name the name of the method
+	 * @param returnString the {@link String} to return
+	 * @return the built {@link MethodSpec}
+	 */
 	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
 		return MethodSpec.methodBuilder(name)
 			.addModifiers(Modifier.PUBLIC)
@@ -231,12 +235,6 @@ public class LilleroProcessor extends AbstractProcessor {
 		String injectorSimpleClassName = cl.getSimpleName().toString() + "Injector";
 		String injectorClassName = packageName + "." + injectorSimpleClassName;
 
-		MethodSpec methodDesc = MethodSpec.methodBuilder("methodDesc")
-			.addModifiers(Modifier.PUBLIC)
-			.returns(String.class)
-			.addCode("return $S;", targetMethodDescriptor)
-			.build();
-
 		MethodSpec inject = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(void.class)
@@ -258,7 +256,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.addMethod(buildStringReturnMethod("reason", ann.reason()))
 			.addMethod(buildStringReturnMethod("targetClass", targetClassSrgName.replace('/', '.')))
 			.addMethod(buildStringReturnMethod("methodName", targetMethodSrgName))
-			.addMethod(methodDesc)
+			.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
 			.addMethod(inject)
 			.build();
 
