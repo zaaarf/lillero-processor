@@ -12,5 +12,5 @@ repositories {
  //TODO: figure out how to make annotationProcessor inherit its dependencies
 dependencies {
     implementation 'com.squareup:javapoet:1.13.0'
-    implementation 'ftbsc:lll:0.2.1'
+    implementation 'ftbsc:lll:0.2.2'
 }

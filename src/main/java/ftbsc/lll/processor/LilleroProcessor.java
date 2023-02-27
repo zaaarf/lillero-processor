@@ -5,8 +5,6 @@ import ftbsc.lll.IInjector;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.exceptions.MappingNotFoundException;
-import ftbsc.lll.processor.exceptions.MappingsFileNotFoundException;
 import ftbsc.lll.tools.DescriptorBuilder;
 import ftbsc.lll.tools.SrgMapper;
 
@@ -28,6 +26,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static ftbsc.lll.processor.ASTUtils.descriptorFromMethodSpec;
+import static ftbsc.lll.processor.ASTUtils.findAnnotatedMethod;
 
 /**
  * The actual annotation processor behind the magic.
@@ -103,91 +104,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * Finds, among the methods of a class cl, the one annotated with ann, and tries to build
-	 * a {@link MethodSpec} from it.
-	 * In case of multiple occurrences, only the first one is returned.
-	 * No check existance check is performed within the method.
-	 * @param cl the {@link TypeElement} for the class containing the desired method
-	 * @param ann the {@link Class} corresponding to the desired annotation
-	 * @return the {@link MethodSpec} representing the desired method
-	 */
-	@SuppressWarnings("OptionalGetWithoutIsPresent")
-	private static ExecutableElement findAnnotatedMethod(TypeElement cl, Class<? extends Annotation> ann) {
-		return (ExecutableElement) cl.getEnclosedElements()
-			.stream()
-			.filter(e -> e.getAnnotation(ann) != null)
-			.findFirst()
-			.get(); //will never be null so can ignore warning
-	}
-
-	/**
-	 * Builds a {@link MethodSpec} for a public method whose body simply returns a {@link String}.
-	 * @param name the name of the method
-	 * @param returnString the {@link String} to return
-	 * @return the built {@link MethodSpec}
-	 */
-	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
-		return MethodSpec.methodBuilder(name)
-			.addModifiers(Modifier.PUBLIC)
-			.returns(String.class)
-			.addStatement("return $S", returnString)
-			.build();
-	}
-
-	/**
-	 * Builds a type descriptor from the given {@link TypeMirror}
-	 * @param t the {@link TypeMirror} representing the desired type
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromType(TypeMirror t) {
-		TypeName type = TypeName.get(t);
-		StringBuilder desc = new StringBuilder();
-		//add array brackets
-		while(type instanceof ArrayTypeName) {
-			desc.append("[");
-			type = ((ArrayTypeName) type).componentType;
-		}
-		if(type instanceof ClassName) {
-			ClassName var = (ClassName) type;
-			desc.append(DescriptorBuilder.nameToDescriptor(var.canonicalName(), 0));
-		} else {
-			if(TypeName.BOOLEAN.equals(type))
-				desc.append("Z");
-			else if(TypeName.CHAR.equals(type))
-				desc.append("C");
-			else if(TypeName.BYTE.equals(type))
-				desc.append("B");
-			else if(TypeName.SHORT.equals(type))
-				desc.append("S");
-			else if(TypeName.INT.equals(type))
-				desc.append("I");
-			else if(TypeName.FLOAT.equals(type))
-				desc.append("F");
-			else if(TypeName.LONG.equals(type))
-				desc.append("J");
-			else if(TypeName.DOUBLE.equals(type))
-				desc.append("D");
-			else if(TypeName.VOID.equals(type))
-				desc.append("V");
-		}
-		return desc.toString();
-	}
-
-	/**
-	 * Builds a method descriptor from the given {@link ExecutableElement}.
-	 * @param m the {@link ExecutableElement} for the method
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromMethodSpec(ExecutableElement m) {
-		StringBuilder methodSignature = new StringBuilder();
-		methodSignature.append("(");
-		m.getParameters().forEach(p -> methodSignature.append(descriptorFromType(p.asType())));
-		methodSignature.append(")");
-		methodSignature.append(descriptorFromType(m.getReturnType()));
-		return methodSignature.toString();
-	}
-
-	/**
 	 * Generates the Injector corresponding to the given class.
 	 * Basically implements the {@link IInjector} interface for you.
 	 * @param cl the {@link TypeElement} for the given class
@@ -201,7 +117,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				StandardCharsets.UTF_8)).lines());
 			is.close();
 		} catch(IOException e) {
-			throw new MappingsFileNotFoundException();
+			throw new RuntimeException("Could not open the specified TSRG file!", e);
 		}
 
 		Patch ann = cl.getAnnotation(Patch.class);
@@ -212,8 +128,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			targetClassCanonicalName = e.getTypeMirror().toString();
 		} //pretty sure class names de facto never change but better safe than sorry
 		String targetClassSrgName = mapper.getMcpClass(targetClassCanonicalName.replace('.', '/'));
-		if(targetClassSrgName == null)
-			throw new MappingNotFoundException(targetClassCanonicalName);
 
 		ExecutableElement targetMethod = findAnnotatedMethod(cl, Target.class);
 		String targetMethodDescriptor = descriptorFromMethodSpec(targetMethod);
@@ -221,9 +135,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			targetClassCanonicalName.replace('.', '/'),
 			targetMethod.getSimpleName() + " " + targetMethodDescriptor
 		);
-
-		if(targetMethodSrgName == null)
-			throw new MappingNotFoundException(targetMethod.getSimpleName() + " " + targetMethodDescriptor);
 
 		ExecutableElement injectorMethod = findAnnotatedMethod(cl, Injector.class);
 
@@ -272,6 +183,20 @@ public class LilleroProcessor extends AbstractProcessor {
 		}
 
 		this.generatedInjectors.add(injectorClassName);
+	}
+
+	/**
+	 * Builds a {@link MethodSpec} for a public method whose body simply returns a {@link String}.
+	 * @param name the name of the method
+	 * @param returnString the {@link String} to return
+	 * @return the built {@link MethodSpec}
+	 */
+	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
+		return MethodSpec.methodBuilder(name)
+			.addModifiers(Modifier.PUBLIC)
+			.returns(String.class)
+			.addStatement("return $S", returnString)
+			.build();
 	}
 
 	/**
