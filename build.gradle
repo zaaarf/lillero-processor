@@ -4,6 +4,8 @@ plugins {
 
 group 'ftbsc.lll.processor'
 
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
 repositories {
     mavenCentral()
     maven { url = 'https://maven.fantabos.co' }
