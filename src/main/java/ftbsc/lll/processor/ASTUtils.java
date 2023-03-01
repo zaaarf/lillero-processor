@@ -7,9 +7,12 @@ import com.squareup.javapoet.TypeName;
 import ftbsc.lll.tools.DescriptorBuilder;
 
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Collection of static utils that didn't really fit into the main class.
@@ -18,19 +21,17 @@ public class ASTUtils {
 	/**
 	 * Finds, among the methods of a class cl, the one annotated with ann, and tries to build
 	 * a {@link ExecutableElement} from it.
-	 * In case of multiple occurrences, only the first one is returned.
-	 * No check existance check is performed within the method.
 	 * @param cl the {@link ExecutableElement} for the class containing the desired method
 	 * @param ann the {@link Class} corresponding to the desired annotation
-	 * @return the {@link MethodSpec} representing the desired method
+	 * @return a {@link List} of {@link MethodSpec}s annotated with the given annotation
+	 * @since 0.2.0
 	 */
-	@SuppressWarnings("OptionalGetWithoutIsPresent")
-	public static ExecutableElement findAnnotatedMethod(TypeElement cl, Class<? extends Annotation> ann) {
-		return (ExecutableElement) cl.getEnclosedElements()
+	public static List<ExecutableElement> findAnnotatedMethods(TypeElement cl, Class<? extends Annotation> ann) {
+		return cl.getEnclosedElements()
 			.stream()
 			.filter(e -> e.getAnnotation(ann) != null)
-			.findFirst()
-			.get(); //will never be null so can ignore warning
+			.map(e -> (ExecutableElement) e)
+			.collect(Collectors.toList());
 	}
 
 	/**
@@ -84,5 +85,42 @@ public class ASTUtils {
 		methodSignature.append(")");
 		methodSignature.append(descriptorFromType(m.getReturnType()));
 		return methodSignature.toString();
+	}
+
+	/**
+	 * Maps a {@link javax.lang.model.element.Modifier} to its reflective
+	 * {@link java.lang.reflect.Modifier} equivalent.
+	 * @param m the {@link Modifier} to map
+	 * @return an integer representing the modifier
+	 * @see java.lang.reflect.Modifier
+	 * @since 0.2.0
+	 */
+	public static int mapModifier(Modifier m) {
+		switch(m) {
+			case PUBLIC:
+				return java.lang.reflect.Modifier.PUBLIC;
+			case PROTECTED:
+				return java.lang.reflect.Modifier.PROTECTED;
+			case PRIVATE:
+				return java.lang.reflect.Modifier.PRIVATE;
+			case ABSTRACT:
+				return java.lang.reflect.Modifier.ABSTRACT;
+			case STATIC:
+				return java.lang.reflect.Modifier.STATIC;
+			case FINAL:
+				return java.lang.reflect.Modifier.FINAL;
+			case TRANSIENT:
+				return java.lang.reflect.Modifier.TRANSIENT;
+			case VOLATILE:
+				return java.lang.reflect.Modifier.VOLATILE;
+			case SYNCHRONIZED:
+				return java.lang.reflect.Modifier.SYNCHRONIZED;
+			case NATIVE:
+				return java.lang.reflect.Modifier.NATIVE;
+			case STRICTFP:
+				return java.lang.reflect.Modifier.STRICT;
+			default:
+				return 0;
+		}
 	}
 }

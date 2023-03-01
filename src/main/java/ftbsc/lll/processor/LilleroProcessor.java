@@ -2,10 +2,9 @@ package ftbsc.lll.processor;
 
 import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
-import ftbsc.lll.processor.annotations.Injector;
-import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.tools.DescriptorBuilder;
+import ftbsc.lll.processor.annotations.*;
+import ftbsc.lll.proxies.FieldProxy;
+import ftbsc.lll.proxies.MethodProxy;
 import ftbsc.lll.tools.SrgMapper;
 
 import javax.annotation.processing.*;
@@ -19,16 +18,17 @@ import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
-import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static ftbsc.lll.processor.ASTUtils.descriptorFromMethodSpec;
-import static ftbsc.lll.processor.ASTUtils.findAnnotatedMethod;
+import static ftbsc.lll.processor.ASTUtils.*;
 
 /**
  * The actual annotation processor behind the magic.
@@ -78,7 +78,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * This checks whether a given class contains the requirements to be parsed into a Lillero injector.
 	 * It must have at least one method annotated with {@link Target}, and one method annotated with {@link Injector}
-	 * that must be public, static and take in a ClassNode and MethodNode from ObjectWeb's ASM library.
+	 * that must take in a ClassNode and MethodNode from ObjectWeb's ASM library.
 	 * @param elem the element to check.
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
@@ -90,8 +90,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
 			return e.getAnnotation(Injector.class) != null
 				&& e.getAnnotation(Target.class) == null
-				&& e.getModifiers().contains(Modifier.PUBLIC)
-				&& e.getModifiers().contains(Modifier.STATIC)
 				&& params.size() == 2
 				&& processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
 				&& processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
@@ -129,14 +127,14 @@ public class LilleroProcessor extends AbstractProcessor {
 		} //pretty sure class names de facto never change but better safe than sorry
 		String targetClassSrgName = mapper.getMcpClass(targetClassCanonicalName.replace('.', '/'));
 
-		ExecutableElement targetMethod = findAnnotatedMethod(cl, Target.class);
+		ExecutableElement targetMethod = findAnnotatedMethods(cl, Target.class).get(0); //there should only be one
 		String targetMethodDescriptor = descriptorFromMethodSpec(targetMethod);
 		String targetMethodSrgName = mapper.getSrgMember(
 			targetClassCanonicalName.replace('.', '/'),
 			targetMethod.getSimpleName() + " " + targetMethodDescriptor
 		);
 
-		ExecutableElement injectorMethod = findAnnotatedMethod(cl, Injector.class);
+		ExecutableElement injectorMethod = findAnnotatedMethods(cl, Injector.class).get(0); //there should only be one
 
 		Element packageElement = cl.getEnclosingElement();
 		while (packageElement.getKind() != ElementKind.PACKAGE)
@@ -149,6 +147,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		MethodSpec inject = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(void.class)
+			.addAnnotation(Override.class)
 			.addParameter(ParameterSpec.builder(
 				TypeName.get(processingEnv
 					.getElementUtils()
@@ -157,17 +156,24 @@ public class LilleroProcessor extends AbstractProcessor {
 				TypeName.get(processingEnv
 					.getElementUtils()
 					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main").build())
-			.addStatement("$T." + injectorMethod.getSimpleName() + "(clazz, main)", TypeName.get(cl.asType()))
+			.addStatement("super." + injectorMethod.getSimpleName() + "(clazz, main)", TypeName.get(cl.asType()))
 			.build();
 
+		List<Modifier> injectorModifiers = new ArrayList<>();
+		injectorModifiers.add(Modifier.PUBLIC);
+		if(cl.getModifiers().contains(Modifier.ABSTRACT))
+			injectorModifiers.add(Modifier.ABSTRACT); //so we dont actually have to instantiate the stubs
+
 		TypeSpec injectorClass = TypeSpec.classBuilder(injectorSimpleClassName)
-			.addModifiers(Modifier.PUBLIC)
+			.addModifiers(injectorModifiers.toArray(new Modifier[0]))
+			.superclass(cl.asType())
 			.addSuperinterface(ClassName.get(IInjector.class))
 			.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
 			.addMethod(buildStringReturnMethod("reason", ann.reason()))
 			.addMethod(buildStringReturnMethod("targetClass", targetClassSrgName.replace('/', '.')))
 			.addMethod(buildStringReturnMethod("methodName", targetMethodSrgName))
 			.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
+			.addMethods(generateRequestedProxies(cl, mapper))
 			.addMethod(inject)
 			.build();
 
@@ -194,10 +200,83 @@ public class LilleroProcessor extends AbstractProcessor {
 	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
 		return MethodSpec.methodBuilder(name)
 			.addModifiers(Modifier.PUBLIC)
+			.addAnnotation(Override.class)
 			.returns(String.class)
 			.addStatement("return $S", returnString)
 			.build();
 	}
+
+	/**
+	 * Finds any method annotated with {@link FindMethod} or {@link FindField} within the given
+	 * class, and builds the {@link MethodSpec} necessary for building it.
+	 * @param cl the class to search
+	 * @return a {@link List} of method specs
+	 * @since 0.2.0
+	 */
+	private List<MethodSpec> generateRequestedProxies(TypeElement cl, SrgMapper mapper) {
+		List<MethodSpec> generated = new ArrayList<>();
+		findAnnotatedMethods(cl, FindMethod.class)
+			.stream()
+			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
+			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
+			.forEach(m -> {
+				FindMethod ann = m.getAnnotation(FindMethod.class);
+				String targetMethodName = ann.name().equals("") ? m.getSimpleName().toString() : ann.name();
+				try {
+					MethodSpec.Builder b = MethodSpec.overriding(m);
+					Method targetMethod = ann.parent().getMethod(
+						targetMethodName,
+						ann.params()
+					);
+					b.addStatement("$T bd = $T.builder($S)",
+						MethodProxy.Builder.class,
+						MethodProxy.class,
+						targetMethodName
+					);
+					b.addStatement("bd.setParent($S)", targetMethod.getDeclaringClass().getCanonicalName());
+					b.addStatement("bd.setModifier($L)", targetMethod.getModifiers());
+					for(Class<?> p : targetMethod.getParameterTypes())
+						b.addStatement("bd.addParameter($T.class)", p);
+					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
+					b.addStatement("return bd.build()");
+					generated.add(b.build());
+				} catch(NoSuchMethodException e) {
+					processingEnv.getMessager().printMessage(
+						Diagnostic.Kind.ERROR,
+						"Method not found: " + targetMethodName
+					);
+				}
+			});
+		findAnnotatedMethods(cl, FindField.class)
+			.stream()
+			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
+			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
+			.forEach(m -> {
+				FindField ann = m.getAnnotation(FindField.class);
+				String targetFieldName = ann.name().equals("") ? m.getSimpleName().toString() : ann.name();
+				try {
+					MethodSpec.Builder b = MethodSpec.overriding(m);
+					Field targetField = ann.parent().getField(targetFieldName);
+					b.addStatement("$T bd = $T.builder($S)",
+						FieldProxy.Builder.class,
+						FieldProxy.class,
+						targetFieldName
+					);
+					b.addStatement("bd.setParent($S)", targetField.getDeclaringClass().getCanonicalName());
+					b.addStatement("bd.setModifier($L)", targetField.getModifiers());
+					b.addStatement("bd.setType($T.class)", targetField.getType());
+					b.addStatement("return bd.build()");
+					generated.add(b.build());
+				} catch(NoSuchFieldException e) {
+					processingEnv.getMessager().printMessage(
+						Diagnostic.Kind.ERROR,
+						"Field not found: " + targetFieldName + " in class " + ann.parent().getCanonicalName()
+					);
+				}
+			});
+		return generated;
+	}
+
 
 	/**
 	 * Generates the Service Provider file for the generated injectors.
