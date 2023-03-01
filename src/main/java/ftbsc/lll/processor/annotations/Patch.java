@@ -6,8 +6,8 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * Marks the class as containing an injector for a user-specified {@link Class}.
- * It will be discarded unless {@link ftbsc.lll.processor.annotations.Target} and
- * {@link Injector} are properly placed within.
+ * It will be discarded unless {@link Target} and {@link Injector} are properly
+ * placed within the annotated class.
  * @see Target
  * @see Injector
  */
