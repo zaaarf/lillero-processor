@@ -144,6 +144,10 @@ public class LilleroProcessor extends AbstractProcessor {
 		String injectorSimpleClassName = cl.getSimpleName().toString() + "Injector";
 		String injectorClassName = packageName + "." + injectorSimpleClassName;
 
+		MethodSpec stubOverride = MethodSpec.overriding(targetMethod)
+			.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
+			.build();
+
 		MethodSpec inject = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(void.class)
@@ -159,13 +163,8 @@ public class LilleroProcessor extends AbstractProcessor {
 			.addStatement("super." + injectorMethod.getSimpleName() + "(clazz, main)", TypeName.get(cl.asType()))
 			.build();
 
-		List<Modifier> injectorModifiers = new ArrayList<>();
-		injectorModifiers.add(Modifier.PUBLIC);
-		if(cl.getModifiers().contains(Modifier.ABSTRACT))
-			injectorModifiers.add(Modifier.ABSTRACT); //so we dont actually have to instantiate the stubs
-
 		TypeSpec injectorClass = TypeSpec.classBuilder(injectorSimpleClassName)
-			.addModifiers(injectorModifiers.toArray(new Modifier[0]))
+			.addModifiers(Modifier.PUBLIC)
 			.superclass(cl.asType())
 			.addSuperinterface(ClassName.get(IInjector.class))
 			.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
@@ -174,6 +173,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.addMethod(buildStringReturnMethod("methodName", targetMethodSrgName))
 			.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
 			.addMethods(generateRequestedProxies(cl, mapper))
+			.addMethod(stubOverride)
 			.addMethod(inject)
 			.build();
 
