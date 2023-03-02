@@ -78,7 +78,7 @@ public class ASTUtils {
 	 * @param m the {@link ExecutableElement} for the method
 	 * @return a {@link String} containing the relevant descriptor
 	 */
-	public static String descriptorFromMethodSpec(ExecutableElement m) {
+	public static String descriptorFromExecutableElement(ExecutableElement m) {
 		StringBuilder methodSignature = new StringBuilder();
 		methodSignature.append("(");
 		m.getParameters().forEach(p -> methodSignature.append(descriptorFromType(p.asType())));
