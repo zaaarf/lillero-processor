@@ -6,8 +6,6 @@ First things first, add the processor and its dependencies to your `build.gradle
 ```groovy
 dependencies {
 	implementation 'ftbsc.lll:processor:0.1.0'
-	annotationProcessor 'com.squareup:javapoet:1.13.0'
-	annotationProcessor 'ftbsc:lll:0.2.1'
 	annotationProcessor 'ftbsc.lll:processor:0.1.0'
 }
 ```
