@@ -105,9 +105,24 @@ public class LilleroProcessor extends AbstractProcessor {
 
 	/**
 	 * Finds the class name and maps it to the correct format.
+	 * @param name the fully qualified name of the class to convert
+	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
+	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
+	 *           names. However, this method still performs a conversion - just in case there is an
+	 *           odd one out.
+	 * @return the fully qualified class name
+	 * @since 0.3.0
+	 */
+	private static String findClassName(String name, SrgMapper mapper) {
+		return mapper == null ? name : mapper.mapClass(name, obfuscatedEnvironment).replace('/', '.');
+	}
+
+	/**
+	 * Finds the class name and maps it to the correct format.
 	 * @param patchAnn the {@link Patch} annotation containing target class info
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link SrgMapper} to use, may be null
 	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
 	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
 	 *           names. However, this method still performs a conversion - just in case there is an
@@ -120,13 +135,13 @@ public class LilleroProcessor extends AbstractProcessor {
 			methodAnn == null || methodAnn.parent() == Object.class
 				? getClassFullyQualifiedName(patchAnn.value())
 				: getClassFullyQualifiedName(methodAnn.parent());
-		return mapper.mapClass(fullyQualifiedName, obfuscatedEnvironment).replace('/', '.');
+		return findClassName(fullyQualifiedName, mapper);
 	}
 
 	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param patchAnn the {@link Patch} annotation containing target class info
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link SrgMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
@@ -135,30 +150,34 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
+	 * Finds the member name and maps it to the correct format.
+	 * @param parentFQN the already mapped FQN of the parent class
+	 * @param memberName the name of the member
+	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @return the internal class name
+	 * @since 0.3.0
+	 */
+	private static String findMemberName(String parentFQN, String memberName, SrgMapper mapper) {
+		return mapper == null ? memberName : mapper.mapMember(parentFQN, memberName, obfuscatedEnvironment);
+	}
+
+	/**
 	 * Finds the method name and maps it to the correct format.
 	 * @param parentFQN the already mapped FQN of the parent class
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link SrgMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
 	private static String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, SrgMapper mapper) {
 		String methodName = methodAnn == null ? stub.getSimpleName().toString() : methodAnn.name();
 		try {
-			methodName = mapper.mapMember(
-				parentFQN,
-				methodName,
-				obfuscatedEnvironment
-			);
+			methodName = findMemberName(parentFQN, methodName, mapper);
 		} catch(MappingNotFoundException e) {
 			//not found: try again with the name of the annotated method
 			if(methodAnn == null) {
-				methodName = mapper.mapMember(
-					parentFQN,
-					stub.getSimpleName().toString(),
-					obfuscatedEnvironment
-				);
+				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), mapper);
 			} else throw e;
 		}
 		return methodName;
@@ -261,11 +280,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	private VariableElement findField(ExecutableElement stub, SrgMapper mapper) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindField fieldAnn = stub.getAnnotation(FindField.class);
-		String parentName = mapper.mapClass(getClassFullyQualifiedName(
+		String parentName = findClassName(getClassFullyQualifiedName(
 			fieldAnn.parent().equals(Object.class)
 				? patchAnn.value()
 				: fieldAnn.parent()
-		), obfuscatedEnvironment);
+		), mapper);
 		String name = fieldAnn.name().equals("")
 			? stub.getSimpleName().toString()
 			: fieldAnn.name();
@@ -288,16 +307,14 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param cl the {@link TypeElement} for the given class
 	 */
 	private void generateInjectors(TypeElement cl) {
-		SrgMapper mapper;
+		SrgMapper mapper = null;
 		try { //TODO: cant we get it from local?
 			URL url = new URL("https://data.fantabos.co/output.tsrg");
 			InputStream is = url.openStream();
 			mapper = new SrgMapper(new BufferedReader(new InputStreamReader(is,
 				StandardCharsets.UTF_8)).lines());
 			is.close();
-		} catch(IOException e) {
-			throw new RuntimeException("Could not open the specified TSRG file!", e);
-		} //todo attempt to proceed without mappings
+		} catch(IOException ignored) {} //TODO: proper handling
 
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
