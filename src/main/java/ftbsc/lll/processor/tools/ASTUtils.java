@@ -1,4 +1,4 @@
-package ftbsc.lll.processor;
+package ftbsc.lll.processor.tools;
 
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
@@ -9,6 +9,7 @@ import ftbsc.lll.tools.DescriptorBuilder;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -35,12 +36,11 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Builds a type descriptor from the given {@link TypeMirror}
-	 * @param t the {@link TypeMirror} representing the desired type
+	 * Builds a type descriptor from the given {@link TypeName}.
+	 * @param type the {@link TypeName} representing the desired type
 	 * @return a {@link String} containing the relevant descriptor
 	 */
-	public static String descriptorFromType(TypeMirror t) {
-		TypeName type = TypeName.get(t);
+	public static String descriptorFromType(TypeName type) {
 		StringBuilder desc = new StringBuilder();
 		//add array brackets
 		while(type instanceof ArrayTypeName) {
@@ -71,6 +71,15 @@ public class ASTUtils {
 				desc.append("V");
 		}
 		return desc.toString();
+	}
+
+	/**
+	 * Builds a type descriptor from the given {@link TypeMirror}.
+	 * @param t the {@link TypeMirror} representing the desired type
+	 * @return a {@link String} containing the relevant descriptor
+	 */
+	public static String descriptorFromType(TypeMirror t) {
+		return descriptorFromType(TypeName.get(t));
 	}
 
 	/**
@@ -121,6 +130,22 @@ public class ASTUtils {
 				return java.lang.reflect.Modifier.STRICT;
 			default:
 				return 0;
+		}
+	}
+
+	/**
+	 * Safely converts a {@link Class} to its fully qualified name. See
+	 * <a href="https://area-51.blog/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor">this blogpost</a>
+	 * for more information.
+	 * @param clazz the class to get the name for
+	 * @return the fully qualified name of the given class
+	 * @since 0.3.0
+	 */
+	public static String getClassFullyQualifiedName(Class<?> clazz) {
+		try {
+			return clazz.getCanonicalName();
+		} catch(MirroredTypeException e) {
+			return e.getTypeMirror().toString();
 		}
 	}
 }

@@ -15,7 +15,7 @@ repositories {
 
 dependencies {
     implementation 'com.squareup:javapoet:1.13.0'
-    implementation 'ftbsc:lll:0.3.0'
+    implementation 'ftbsc:lll:0.3.2'
 }
 
 jar {

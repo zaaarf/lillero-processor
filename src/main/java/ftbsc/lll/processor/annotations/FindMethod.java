@@ -17,7 +17,7 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface FindMethod {
-	Class<?> parent();
+	Class<?> parent() default Object.class;
 	String name() default "";
-	Class<?>[] params();
+	Class<?>[] params() default {};
 }

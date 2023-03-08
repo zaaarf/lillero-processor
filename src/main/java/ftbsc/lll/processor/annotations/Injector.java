@@ -1,6 +1,7 @@
 package ftbsc.lll.processor.annotations;
 
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
@@ -14,5 +15,9 @@ import java.lang.annotation.RetentionPolicy;
  * @see Target
  */
 @Retention(RetentionPolicy.CLASS)
+@Repeatable(MultipleInjectors.class)
 @java.lang.annotation.Target(ElementType.METHOD)
-public @interface Injector {}
+public @interface Injector {
+	String targetName() default "";
+	Class<?>[] params() default {};
+}
