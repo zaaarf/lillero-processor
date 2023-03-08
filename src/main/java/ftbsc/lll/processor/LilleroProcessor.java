@@ -6,7 +6,7 @@ import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.*;
-import ftbsc.lll.processor.tools.SrgMapper;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.FieldProxy;
 import ftbsc.lll.proxies.MethodProxy;
 
@@ -33,6 +33,7 @@ import static ftbsc.lll.processor.tools.ASTUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
+@SupportedOptions("mappingsFile")
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -41,9 +42,35 @@ public class LilleroProcessor extends AbstractProcessor {
 	private final Set<String> generatedInjectors = new HashSet<>();
 
 	/**
-	 * A static boolean that should be set to true when ran in a non-obfuscated environment.
+	 * The {@link ObfuscationMapper} used to convert classes and variables
+	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
-	public static boolean obfuscatedEnvironment = false; //todo: set this
+	private ObfuscationMapper mapper;
+
+	/**
+	 * Initializes the processor with the processing environment by
+	 * setting the {@code processingEnv} field to the value of the
+	 * {@code processingEnv} argument.
+	 * @param processingEnv environment to access facilities the tool framework
+	 * provides to the processor
+	 * @throws IllegalStateException if this method is called more than once.
+	 */
+	@Override
+	public synchronized void init(ProcessingEnvironment processingEnv) {
+		super.init(processingEnv);
+		String location = processingEnv.getOptions().get("mappingsFile");
+		if(location == null)
+			mapper = null;
+		else { //TODO: add local file
+			try {
+				URL url = new URL(location);
+				InputStream is = url.openStream();
+				mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(is,
+					StandardCharsets.UTF_8)).lines());
+				is.close();
+			} catch(IOException ignored) {} //TODO: proper handling
+		}
+	}
 
 	/**
 	 * Where the actual processing happens.
@@ -106,7 +133,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param name the fully qualified name of the class to convert
-	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
 	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
 	 *           names. However, this method still performs a conversion - just in case there is an
@@ -114,15 +141,15 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
-	private static String findClassName(String name, SrgMapper mapper) {
-		return mapper == null ? name : mapper.mapClass(name, obfuscatedEnvironment).replace('/', '.');
+	private static String findClassName(String name, ObfuscationMapper mapper) {
+		return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
 	}
 
 	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param patchAnn the {@link Patch} annotation containing target class info
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
 	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
 	 *           names. However, this method still performs a conversion - just in case there is an
@@ -130,7 +157,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
-	private static String findClassName(Patch patchAnn, FindMethod methodAnn, SrgMapper mapper) {
+	private static String findClassName(Patch patchAnn, FindMethod methodAnn, ObfuscationMapper mapper) {
 		String fullyQualifiedName =
 			methodAnn == null || methodAnn.parent() == Object.class
 				? getClassFullyQualifiedName(patchAnn.value())
@@ -141,11 +168,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param patchAnn the {@link Patch} annotation containing target class info
-	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findClassName(Patch patchAnn, SrgMapper mapper) {
+	private static String findClassName(Patch patchAnn, ObfuscationMapper mapper) {
 		return findClassName(patchAnn, null, mapper);
 	}
 
@@ -153,12 +180,12 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Finds the member name and maps it to the correct format.
 	 * @param parentFQN the already mapped FQN of the parent class
 	 * @param memberName the name of the member
-	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMemberName(String parentFQN, String memberName, SrgMapper mapper) {
-		return mapper == null ? memberName : mapper.mapMember(parentFQN, memberName, obfuscatedEnvironment);
+	private static String findMemberName(String parentFQN, String memberName, ObfuscationMapper mapper) {
+		return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName);
 	}
 
 	/**
@@ -166,11 +193,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param parentFQN the already mapped FQN of the parent class
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link SrgMapper} to use, may be null
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, SrgMapper mapper) {
+	private static String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
 		String methodName = methodAnn == null ? stub.getSimpleName().toString() : methodAnn.name();
 		try {
 			methodName = findMemberName(parentFQN, methodName, mapper);
@@ -188,11 +215,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param patchAnn the {@link Patch} annotation containing target class info
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link ObfuscationMapper} to use
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMethodName(Patch patchAnn, FindMethod methodAnn, ExecutableElement stub, SrgMapper mapper) {
+	private static String findMethodName(Patch patchAnn, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
 		return findMethodName(findClassName(patchAnn, methodAnn, mapper), methodAnn, stub, mapper);
 	}
 
@@ -250,13 +277,13 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the real method corresponding to a stub.
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link ObfuscationMapper} to use
 	 * @return the desired method, if it exists
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private ExecutableElement findRealMethod(ExecutableElement stub, SrgMapper mapper) {
+	private ExecutableElement findRealMethod(ExecutableElement stub, ObfuscationMapper mapper) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindMethod findAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
 		Target target = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
@@ -272,12 +299,12 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the real field corresponding to a stub.
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link SrgMapper} to use
+	 * @param mapper the {@link ObfuscationMapper} to use
 	 * @return the desired method, if it exists
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private VariableElement findField(ExecutableElement stub, SrgMapper mapper) {
+	private VariableElement findField(ExecutableElement stub, ObfuscationMapper mapper) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindField fieldAnn = stub.getAnnotation(FindField.class);
 		String parentName = findClassName(getClassFullyQualifiedName(
@@ -307,15 +334,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param cl the {@link TypeElement} for the given class
 	 */
 	private void generateInjectors(TypeElement cl) {
-		SrgMapper mapper = null;
-		try { //TODO: cant we get it from local?
-			URL url = new URL("https://data.fantabos.co/output.tsrg");
-			InputStream is = url.openStream();
-			mapper = new SrgMapper(new BufferedReader(new InputStreamReader(is,
-				StandardCharsets.UTF_8)).lines());
-			is.close();
-		} catch(IOException ignored) {} //TODO: proper handling
-
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		String targetClassSrgName = findClassName(patchAnn, mapper);
@@ -481,7 +499,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return a {@link List} of method specs
 	 * @since 0.2.0
 	 */
-	private List<MethodSpec> generateRequestedProxies(TypeElement cl, SrgMapper mapper) {
+	private List<MethodSpec> generateRequestedProxies(TypeElement cl, ObfuscationMapper mapper) {
 		List<MethodSpec> generated = new ArrayList<>();
 		findAnnotatedMethods(cl, FindMethod.class)
 			.stream()

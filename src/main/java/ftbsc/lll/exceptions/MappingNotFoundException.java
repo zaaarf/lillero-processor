@@ -1,9 +1,9 @@
 package ftbsc.lll.exceptions;
 
-import ftbsc.lll.processor.tools.SrgMapper;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 /**
- * Thrown upon failure to find the requested mapping within a loaded {@link SrgMapper}.
+ * Thrown upon failure to find the requested mapping within a loaded {@link ObfuscationMapper}.
  */
 public class MappingNotFoundException extends RuntimeException {
 
