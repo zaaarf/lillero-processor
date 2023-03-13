@@ -3,6 +3,7 @@ package ftbsc.lll.processor;
 import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.*;
@@ -20,6 +21,8 @@ import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -61,14 +64,26 @@ public class LilleroProcessor extends AbstractProcessor {
 		String location = processingEnv.getOptions().get("mappingsFile");
 		if(location == null)
 			mapper = null;
-		else { //TODO: add local file
+		else {
+			InputStream targetStream;
 			try {
-				URL url = new URL(location);
-				InputStream is = url.openStream();
-				mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(is,
-					StandardCharsets.UTF_8)).lines());
-				is.close();
-			} catch(IOException ignored) {} //TODO: proper handling
+				URI target = new URI(location);
+				targetStream = target.toURL().openStream();
+			} catch(URISyntaxException | IOException e) {
+				//may be a local file path
+				File f = new File(location);
+				if(!f.exists())
+					throw new InvalidResourceException(location);
+				try {
+					targetStream = new FileInputStream(f);
+				} catch(FileNotFoundException ex) {
+					throw new InvalidResourceException(location);
+				}
+			}
+			//assuming its tsrg file
+			//todo: replace crappy homebaked parser with actual library
+			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
+				StandardCharsets.UTF_8)).lines());
 		}
 	}
 
