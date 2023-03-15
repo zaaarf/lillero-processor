@@ -1,9 +1,9 @@
 package ftbsc.lll.exceptions;
 
-import ftbsc.lll.processor.tools.obfuscation.IMapper;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 /**
- * Thrown upon failure to find the requested mapping within a loaded {@link IMapper}.
+ * Thrown upon failure to find the requested mapping within a loaded {@link ObfuscationMapper}.
  */
 public class MappingNotFoundException extends RuntimeException {
 
