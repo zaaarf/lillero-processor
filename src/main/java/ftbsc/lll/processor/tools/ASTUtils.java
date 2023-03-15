@@ -6,12 +6,17 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import ftbsc.lll.tools.DescriptorBuilder;
 
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -135,19 +140,53 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Safely converts a {@link Class} to its fully qualified name. See
-	 * <a href="https://area-51.blog/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor">this blogpost</a>
-	 * for more information.
+	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param fun the annotation function returning the class
 	 * @return the fully qualified name of the given class
 	 * @since 0.3.0
 	 */
-	public static <T extends Annotation> String getClassFullyQualifiedName(T ann, Function<Annotation, Class<?>> fun) {
+	public static <T extends Annotation> String getClassFullyQualifiedName(T ann, Function<T, Class<?>> fun) {
 		try {
 			return fun.apply(ann).getCanonicalName();
 		} catch(MirroredTypeException e) {
 			return e.getTypeMirror().toString();
 		}
+	}
+
+	/**
+	 * Safely extracts a {@link Class} array from an annotation.
+	 * @param ann the annotation containing the class
+	 * @param fun the annotation function returning the class
+	 * @param elementUtils the element utils corresponding to the {@link ProcessingEnvironment}
+	 * @return a list of {@link TypeMirror}s representing the classes
+	 * @since 0.3.0
+	 */
+	public static <T extends Annotation> List<TypeMirror> classArrayFromAnnotation(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {
+		List<TypeMirror> params = new ArrayList<>();
+		try {
+			params.addAll(Arrays.stream(fun.apply(ann))
+				.map(Class::getCanonicalName)
+				.map(fqn -> elementUtils.getTypeElement(fqn).asType())
+				.collect(Collectors.toList()));
+		} catch(MirroredTypesException e) {
+			params.addAll(e.getTypeMirrors());
+		}
+		return params;
+	}
+
+	/**
+	 * Builds a (partial, not including the return type) method descriptor from its parameters
+	 * @param ann the annotation containing the class
+	 * @param fun the annotation function returning the class
+	 * @return the method descriptor
+	 */
+	public static <T extends Annotation> String methodDescriptorFromParams(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {
+		List<TypeMirror> mirrors = classArrayFromAnnotation(ann, fun, elementUtils);
+		StringBuilder sb = new StringBuilder("(");
+		for(TypeMirror t : mirrors)
+			sb.append(descriptorFromType(t));
+		sb.append(")");
+		return sb.toString();
 	}
 }

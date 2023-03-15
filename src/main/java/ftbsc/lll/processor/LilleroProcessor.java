@@ -15,7 +15,6 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
-import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -176,8 +175,8 @@ public class LilleroProcessor extends AbstractProcessor {
 	private static String findClassName(Patch patchAnn, FindMethod methodAnn, ObfuscationMapper mapper) {
 		String fullyQualifiedName =
 			methodAnn == null || methodAnn.parent() == Object.class
-				? getClassFullyQualifiedName(patchAnn, p -> patchAnn.value())
-				: getClassFullyQualifiedName(methodAnn, m -> methodAnn.parent());
+				? getClassFullyQualifiedName(patchAnn, Patch::value)
+				: getClassFullyQualifiedName(methodAnn, FindMethod::parent);
 		return findClassName(fullyQualifiedName, mapper);
 	}
 
@@ -200,8 +199,8 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMemberName(String parentFQN, String memberName, ObfuscationMapper mapper) {
-		return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName);
+	private static String findMemberName(String parentFQN, String memberName, String methodDescriptor, ObfuscationMapper mapper) {
+		return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
 	}
 
 	/**
@@ -213,14 +212,18 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
+	private String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
 		String methodName = methodAnn == null ? stub.getSimpleName().toString() : methodAnn.name();
+		String methodDescriptor;
+		if(methodAnn == null)
+			methodDescriptor = descriptorFromExecutableElement(stub);
+		else methodDescriptor = methodDescriptorFromParams(methodAnn, FindMethod::params, processingEnv.getElementUtils());
 		try {
-			methodName = findMemberName(parentFQN, methodName, mapper);
+			methodName = findMemberName(parentFQN, methodName, methodDescriptor, mapper);
 		} catch(MappingNotFoundException e) {
 			//not found: try again with the name of the annotated method
 			if(methodAnn == null) {
-				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), mapper);
+				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), methodDescriptor, mapper);
 			} else throw e;
 		}
 		return methodName;
@@ -235,7 +238,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private static String findMethodName(Patch patchAnn, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
+	private String findMethodName(Patch patchAnn, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
 		return findMethodName(findClassName(patchAnn, methodAnn, mapper), methodAnn, stub, mapper);
 	}
 
@@ -325,8 +328,8 @@ public class LilleroProcessor extends AbstractProcessor {
 		FindField fieldAnn = stub.getAnnotation(FindField.class);
 		String parentName;
 		if(fieldAnn.parent().equals(Object.class))
-			parentName = getClassFullyQualifiedName(patchAnn, p -> patchAnn.value());
-		else parentName = getClassFullyQualifiedName(fieldAnn, f -> fieldAnn.parent());
+			parentName = getClassFullyQualifiedName(patchAnn, Patch::value);
+		else parentName = getClassFullyQualifiedName(fieldAnn, FindField::parent);
 		parentName = findClassName(parentName, mapper);
 		String name = fieldAnn.name().equals("")
 			? stub.getSimpleName().toString()
@@ -408,15 +411,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				if(injectionCandidates.size() == 1)
 					injectionTarget = injectionCandidates.get(0);
 
-				List<TypeMirror> params = new ArrayList<>();
-				try {
-					params.addAll(Arrays.stream(injectorAnn.params())
-							.map(Class::getCanonicalName)
-							.map(fqn -> processingEnv.getElementUtils().getTypeElement(fqn).asType())
-							.collect(Collectors.toList()));
-				} catch(MirroredTypesException e) {
-					params.addAll(e.getTypeMirrors());
-				}
+				List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
 
 				if(params.size() != 0) {
 					StringBuilder descr = new StringBuilder("(");

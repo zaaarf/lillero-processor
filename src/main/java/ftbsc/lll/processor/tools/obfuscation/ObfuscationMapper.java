@@ -1,10 +1,13 @@
 package ftbsc.lll.processor.tools.obfuscation;
 
+import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -76,14 +79,15 @@ public class ObfuscationMapper {
 	 * with a space, because that's how it is in .tsrg files.
 	 * @param parentName the unobfuscated internal name of the parent class
 	 * @param memberName the field name or method signature
+	 * @param methodDescriptor the optional descriptor of the member, may be null or partial
 	 * @return the obfuscated name of the given member
 	 * @throws MappingNotFoundException if no mapping is found
 	 */
-	public String obfuscateMember(String parentName, String memberName) {
+	public String obfuscateMember(String parentName, String memberName, String methodDescriptor) {
 		ObfuscationData data = mapper.get(parentName.replace('.', '/'));
 		if(data == null)
 			throw new MappingNotFoundException(parentName + "::" + memberName);
-		String member = data.members.get(memberName);
+		String member = data.get(memberName, methodDescriptor);
 		if(member == null)
 			throw new MappingNotFoundException(parentName + "::" + memberName);
 		return member;
@@ -165,6 +169,33 @@ public class ObfuscationMapper {
 				members.put(split[0], split[1]);
 			else if (split.length == 3) //method
 				members.put(split[0] + " " + split[1], split[2]);
+		}
+
+		/**
+		 * Gets an obfuscated member given the method name and a method descriptor,
+		 * which may be partial (i.e. not include return type) or null if the member
+		 * is not a method.
+		 * @param memberName member name
+		 * @param methodDescriptor the method descriptor, or null if it's not a method
+		 * @return the requested obfuscated name, or null if nothing was found
+		 * @throws AmbiguousDefinitionException if not enough data was given to uniquely identify a mapping
+		 */
+		public String get(String memberName, String methodDescriptor) {
+			if(methodDescriptor == null)
+				return members.get(memberName);
+			List<String> candidates = members.values().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
+			if(candidates.size() == 1)
+				return members.get(candidates.get(0));
+			String signature = memberName + " " + methodDescriptor;
+			candidates = candidates.stream().filter(m -> m.startsWith(signature)).collect(Collectors.toList());
+			switch(candidates.size()) {
+				case 0:
+					return null;
+				case 1:
+					return members.get(candidates.get(0));
+				default:
+					throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + unobf + "::" + memberName);
+			}
 		}
 	}
 }
