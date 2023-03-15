@@ -15,6 +15,7 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
+import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -407,9 +408,19 @@ public class LilleroProcessor extends AbstractProcessor {
 				if(injectionCandidates.size() == 1)
 					injectionTarget = injectionCandidates.get(0);
 
-				if(injectorAnn.params().length != 0) {
+				List<TypeMirror> params = new ArrayList<>();
+				try {
+					params.addAll(Arrays.stream(injectorAnn.params())
+							.map(Class::getCanonicalName)
+							.map(fqn -> processingEnv.getElementUtils().getTypeElement(fqn).asType())
+							.collect(Collectors.toList()));
+				} catch(MirroredTypesException e) {
+					params.addAll(e.getTypeMirrors());
+				}
+
+				if(params.size() != 0) {
 					StringBuilder descr = new StringBuilder("(");
-					for(Class<?> p : injectorAnn.params())
+					for(TypeMirror p : params)
 						descr.append(descriptorFromType(TypeName.get(p)));
 					descr.append(")");
 					injectionCandidates =
