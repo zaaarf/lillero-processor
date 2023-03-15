@@ -149,10 +149,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Finds the class name and maps it to the correct format.
 	 * @param name the fully qualified name of the class to convert
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
-	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
-	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
-	 *           names. However, this method still performs a conversion - just in case there is an
-	 *           odd one out.
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
@@ -165,10 +161,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param patchAnn the {@link Patch} annotation containing target class info
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
-	 * @implNote De facto, there is never any difference between the SRG and MCP name of a class.
-	 *           In theory, differences only arise between SRG/MCP names and Notch (fully obfuscated)
-	 *           names. However, this method still performs a conversion - just in case there is an
-	 *           odd one out.
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
@@ -205,41 +197,28 @@ public class LilleroProcessor extends AbstractProcessor {
 
 	/**
 	 * Finds the method name and maps it to the correct format.
+	 *
 	 * @param parentFQN the already mapped FQN of the parent class
 	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @param stub      the {@link ExecutableElement} for the stub
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	private String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
+	private String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub) {
 		String methodName = methodAnn == null ? stub.getSimpleName().toString() : methodAnn.name();
 		String methodDescriptor;
 		if(methodAnn == null)
 			methodDescriptor = descriptorFromExecutableElement(stub);
 		else methodDescriptor = methodDescriptorFromParams(methodAnn, FindMethod::params, processingEnv.getElementUtils());
 		try {
-			methodName = findMemberName(parentFQN, methodName, methodDescriptor, mapper);
+			methodName = findMemberName(parentFQN, methodName, methodDescriptor, null);
 		} catch(MappingNotFoundException e) {
 			//not found: try again with the name of the annotated method
 			if(methodAnn == null) {
-				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), methodDescriptor, mapper);
+				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), methodDescriptor, null);
 			} else throw e;
 		}
 		return methodName;
-	}
-
-	/**
-	 * Finds the method name and maps it to the correct format.
-	 * @param patchAnn the {@link Patch} annotation containing target class info
-	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link ObfuscationMapper} to use
-	 * @return the internal class name
-	 * @since 0.3.0
-	 */
-	private String findMethodName(Patch patchAnn, FindMethod methodAnn, ExecutableElement stub, ObfuscationMapper mapper) {
-		return findMethodName(findClassName(patchAnn, methodAnn, mapper), methodAnn, stub, mapper);
 	}
 
 	/**
@@ -292,18 +271,17 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the real method corresponding to a stub.
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link ObfuscationMapper} to use
 	 * @return the desired method, if it exists
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private ExecutableElement findRealMethod(ExecutableElement stub, ObfuscationMapper mapper) {
+	private ExecutableElement findRealMethodFromStub(ExecutableElement stub) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindMethod findAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
 		Target target = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
-		String parentFQN = findClassName(patchAnn, findAnn, mapper);
-		String methodName = findMethodName(patchAnn, findAnn, stub, mapper);
+		String parentFQN = findClassName(patchAnn, findAnn, null);
+		String methodName = findMethodName(findClassName(patchAnn, findAnn, null), findAnn, stub);
 		return findMethod(
 			parentFQN,
 			methodName,
@@ -314,19 +292,18 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Finds the real field corresponding to a stub.
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @param mapper the {@link ObfuscationMapper} to use
 	 * @return the desired method, if it exists
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private VariableElement findField(ExecutableElement stub, ObfuscationMapper mapper) {
+	private VariableElement findField(ExecutableElement stub) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindField fieldAnn = stub.getAnnotation(FindField.class);
 		String parentName;
 		if(fieldAnn.parent().equals(Object.class))
 			parentName = getClassFullyQualifiedName(patchAnn, Patch::value);
 		else parentName = getClassFullyQualifiedName(fieldAnn, FindField::parent);
-		parentName = findClassName(parentName, mapper);
+		parentName = findClassName(parentName, null);
 		String name = fieldAnn.name().equals("")
 			? stub.getSimpleName().toString()
 			: fieldAnn.name();
@@ -351,7 +328,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	private void generateInjectors(TypeElement cl) {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
-		String targetClassSrgName = findClassName(patchAnn, mapper);
+		String targetClassFQN = findClassName(patchAnn, mapper).replace('/', '.');
 
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -435,7 +412,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					throw new AmbiguousDefinitionException(String.format("Unclear target for injector %s::%s!", cl.getSimpleName(), inj.getSimpleName()));
 				else toGenerate.put(
 						String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-						new InjectorInfo(inj, findRealMethod(injectionTarget, mapper))
+						new InjectorInfo(inj, findRealMethodFromStub(injectionTarget))
 					);
 				iterationNumber++;
 			}
@@ -443,6 +420,9 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
+			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
+			String targetMethodName = findMemberName(targetClassFQN, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
+
 			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).target)
 				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
 				.build();
@@ -468,10 +448,10 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addSuperinterface(ClassName.get(IInjector.class))
 				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
 				.addMethod(buildStringReturnMethod("reason", patchAnn.reason()))
-				.addMethod(buildStringReturnMethod("targetClass", targetClassSrgName.replace('/', '.')))
-				.addMethod(buildStringReturnMethod("methodName", toGenerate.get(injName).target.getSimpleName().toString()))
-				.addMethod(buildStringReturnMethod("methodDesc", descriptorFromExecutableElement(toGenerate.get(injName).target)))
-				.addMethods(generateRequestedProxies(cl, mapper))
+				.addMethod(buildStringReturnMethod("targetClass", targetClassFQN))
+				.addMethod(buildStringReturnMethod("methodName", targetMethodName))
+				.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
+				.addMethods(generateRequestedProxies(cl, this.mapper))
 				.addMethod(stubOverride)
 				.addMethod(inject)
 				.build();
@@ -521,20 +501,28 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
-				ExecutableElement targetMethod = findRealMethod(m, mapper);
+				ExecutableElement targetMethod = findRealMethodFromStub(m);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
+
+				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
+
 				b.addStatement("$T bd = $T.builder($S)",
 					MethodProxy.Builder.class,
 					MethodProxy.class,
-					m.getSimpleName().toString()
+					findMemberName(targetParentFQN, targetMethod.getSimpleName().toString(), descriptorFromExecutableElement(targetMethod), mapper)
 				);
-				b.addStatement("bd.setParent($S)", ((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString());
+
+				b.addStatement("bd.setParent($S)", targetParentFQN);
+
 				for(Modifier mod : targetMethod.getModifiers())
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
+
 				for(TypeParameterElement p : targetMethod.getTypeParameters())
 					b.addStatement("bd.addParameter($T.class)", p.asType());
+
 				b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
 				b.addStatement("return bd.build()");
+
 				generated.add(b.build());
 			});
 		findAnnotatedMethods(cl, FindField.class)
@@ -542,18 +530,25 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
 			.forEach(m -> {
-				VariableElement targetField = findField(m, mapper);
+				VariableElement targetField = findField(m);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
+
+				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
+
 				b.addStatement("$T bd = $T.builder($S)",
 					FieldProxy.Builder.class,
 					FieldProxy.class,
-					targetField.getSimpleName().toString()
+					findMemberName(targetParentFQN, targetField.getSimpleName().toString(), null, mapper)
 				);
+
 				b.addStatement("bd.setParent($S)", ((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString());
+
 				for(Modifier mod : targetField.getModifiers())
+
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
 				b.addStatement("bd.setType($T.class)", targetField.asType());
 				b.addStatement("return bd.build()");
+
 				generated.add(b.build());
 			});
 		return generated;
