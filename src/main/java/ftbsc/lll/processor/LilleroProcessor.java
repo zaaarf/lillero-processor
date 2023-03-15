@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.tools.ASTUtils.getClassFullyQualifiedName;
 
 /**
  * The actual annotation processor behind the magic.
@@ -175,8 +176,8 @@ public class LilleroProcessor extends AbstractProcessor {
 	private static String findClassName(Patch patchAnn, FindMethod methodAnn, ObfuscationMapper mapper) {
 		String fullyQualifiedName =
 			methodAnn == null || methodAnn.parent() == Object.class
-				? getClassFullyQualifiedName(patchAnn.value())
-				: getClassFullyQualifiedName(methodAnn.parent());
+				? getClassFullyQualifiedName(patchAnn, p -> patchAnn.value())
+				: getClassFullyQualifiedName(methodAnn, m -> methodAnn.parent());
 		return findClassName(fullyQualifiedName, mapper);
 	}
 
@@ -322,11 +323,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	private VariableElement findField(ExecutableElement stub, ObfuscationMapper mapper) {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		FindField fieldAnn = stub.getAnnotation(FindField.class);
-		String parentName = findClassName(getClassFullyQualifiedName(
-			fieldAnn.parent().equals(Object.class)
-				? patchAnn.value()
-				: fieldAnn.parent()
-		), mapper);
+		String parentName;
+		if(fieldAnn.parent().equals(Object.class))
+			parentName = getClassFullyQualifiedName(patchAnn, p -> patchAnn.value());
+		else parentName = getClassFullyQualifiedName(fieldAnn, f -> fieldAnn.parent());
+		parentName = findClassName(parentName, mapper);
 		String name = fieldAnn.name().equals("")
 			? stub.getSimpleName().toString()
 			: fieldAnn.name();

@@ -13,6 +13,7 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -137,13 +138,14 @@ public class ASTUtils {
 	 * Safely converts a {@link Class} to its fully qualified name. See
 	 * <a href="https://area-51.blog/2009/02/13/getting-class-values-from-annotations-in-an-annotationprocessor">this blogpost</a>
 	 * for more information.
-	 * @param clazz the class to get the name for
+	 * @param ann the annotation containing the class
+	 * @param fun the annotation function returning the class
 	 * @return the fully qualified name of the given class
 	 * @since 0.3.0
 	 */
-	public static String getClassFullyQualifiedName(Class<?> clazz) {
+	public static <T extends Annotation> String getClassFullyQualifiedName(T ann, Function<Annotation, Class<?>> fun) {
 		try {
-			return clazz.getCanonicalName();
+			return fun.apply(ann).getCanonicalName();
 		} catch(MirroredTypeException e) {
 			return e.getTypeMirror().toString();
 		}
