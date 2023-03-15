@@ -52,7 +52,7 @@ public class ObfuscationMapper {
 	 * @throws MappingNotFoundException if no mapping is found
 	 */
 	public String obfuscateClass(String name)  {
-		ObfuscationData data = mapper.get(name);
+		ObfuscationData data = mapper.get(name.replace('.', '/'));
 		if(data == null)
 			throw new MappingNotFoundException(name);
 		else return data.obf;
@@ -80,10 +80,13 @@ public class ObfuscationMapper {
 	 * @throws MappingNotFoundException if no mapping is found
 	 */
 	public String obfuscateMember(String parentName, String memberName) {
-		ObfuscationData data = mapper.get(parentName);
+		ObfuscationData data = mapper.get(parentName.replace('.', '/'));
 		if(data == null)
 			throw new MappingNotFoundException(parentName + "::" + memberName);
-		return data.members.get(memberName);
+		String member = data.members.get(memberName);
+		if(member == null)
+			throw new MappingNotFoundException(parentName + "::" + memberName);
+		return member;
 	}
 
 	/**
