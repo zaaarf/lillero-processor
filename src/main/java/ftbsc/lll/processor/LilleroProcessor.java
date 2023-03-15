@@ -140,7 +140,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		})) return true;
 		else {
 			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-				"Missing valid @Injector method in @Patch class " + elem + ", skipping.");
+				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
 	}
@@ -256,7 +256,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	private ExecutableElement findMethod(String fullyQualifiedNameParent, String name, String descr, boolean strict) {
 		TypeElement parent = processingEnv.getElementUtils().getTypeElement(fullyQualifiedNameParent);
 		if(parent == null)
-			throw new AmbiguousDefinitionException("Could not find parent class " + fullyQualifiedNameParent + "!");
+			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", fullyQualifiedNameParent));
 
 		//try to find by name
 		List<ExecutableElement> candidates = parent.getEnclosedElements()
@@ -266,14 +266,12 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(e -> e.getSimpleName().contentEquals(name))
 			.collect(Collectors.toList());
 		if(candidates.size() == 0)
-			throw new TargetNotFoundException(name + " " + descr);
+			throw new TargetNotFoundException(String.format("%s %s", name, descr));
 		if(candidates.size() == 1 && !strict)
 			return candidates.get(0);
 		if(descr == null) {
 			throw new AmbiguousDefinitionException(
-				"Found " + candidates.size()
-					+ " methods named " + name
-					+ " in class " + fullyQualifiedNameParent + "!"
+				String.format("Found %d methods named %s in class %s!", candidates.size(), name, fullyQualifiedNameParent)
 			);
 		} else {
 			candidates = candidates.stream()
@@ -282,12 +280,10 @@ public class LilleroProcessor extends AbstractProcessor {
 					: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
 				).collect(Collectors.toList());
 			if(candidates.size() == 0)
-				throw new TargetNotFoundException(name + " " + descr);
+				throw new TargetNotFoundException(String.format("%s %s", name, descr));
 			if(candidates.size() > 1)
 				throw new AmbiguousDefinitionException(
-					"Found " + candidates.size()
-						+ " methods named " + name
-						+ " in class " + fullyQualifiedNameParent + "!"
+					String.format("Found %d methods named %s in class %s!", candidates.size(), name, fullyQualifiedNameParent)
 				);
 			return candidates.get(0);
 		}
@@ -393,6 +389,7 @@ public class LilleroProcessor extends AbstractProcessor {
 							.collect(Collectors.toList());
 				} else if(targets.size() == 1) {
 					//case 2: there is only one target
+					injectionCandidates = new ArrayList<>();
 					injectionCandidates.add(targets.get(0));
 				} else {
 					//case 3: try to match by injectTargetName
@@ -410,6 +407,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				if(injectionCandidates.size() == 1)
 					injectionTarget = injectionCandidates.get(0);
+
 				else {
 					List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
 
@@ -434,9 +432,9 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				//if we haven't found it yet, it's an ambiguity
 				if(injectionTarget == null)
-					throw new AmbiguousDefinitionException("Unclear target for injector " + inj.getSimpleName().toString() + "!");
+					throw new AmbiguousDefinitionException(String.format("Unclear target for injector %s::%s!", cl.getSimpleName(), inj.getSimpleName()));
 				else toGenerate.put(
-						cl.getSimpleName().toString() + "Injector" + iterationNumber,
+						String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
 						new InjectorInfo(inj, findRealMethod(injectionTarget, mapper))
 					);
 				iterationNumber++;
@@ -461,7 +459,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					TypeName.get(processingEnv
 						.getElementUtils()
 						.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main").build())
-				.addStatement("super." + toGenerate.get(injName).injector.getSimpleName() + "(clazz, main)", TypeName.get(cl.asType()))
+				.addStatement(String.format("super.%s(clazz, main)", toGenerate.get(injName).injector.getSimpleName()), TypeName.get(cl.asType()))
 				.build();
 
 			TypeSpec injectorClass = TypeSpec.classBuilder(injName)
@@ -479,7 +477,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.build();
 
 			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
-			String injectorClassName = packageName + "." + injName;
+			String injectorClassName = String.format("%s.%s", packageName, injName);
 
 			try {
 				JavaFileObject injectorFile = processingEnv.getFiler().createSourceFile(injectorClassName);
