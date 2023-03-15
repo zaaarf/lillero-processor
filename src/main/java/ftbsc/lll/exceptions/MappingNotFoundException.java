@@ -12,7 +12,7 @@ public class MappingNotFoundException extends RuntimeException {
 	 * @param mapping the relevant mapping
 	 */
 	public MappingNotFoundException(String mapping) {
-		super("Could not find mapping for " + mapping + "!");
+		super(String.format("Could not find mapping for %s!", mapping));
 	}
 
 	/**

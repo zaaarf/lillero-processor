@@ -17,6 +17,6 @@ public class InvalidResourceException extends RuntimeException {
 	 * @param name the resource name
 	 */
 	public InvalidResourceException(String name) {
-		super("Specified resource " + name + " was not found!");
+		super(String.format("Specified resource %s was not found!", name));
 	}
 }
