@@ -384,64 +384,60 @@ public class LilleroProcessor extends AbstractProcessor {
 			for(Injector injectorAnn : minjAnn) { //java is dumb
 				List<ExecutableElement> injectionCandidates = targets;
 
-				//case 1: it has a name, try to match it
-				if(!injectorAnn.targetName().equals("") && targetNames.contains(injectorAnn.targetName()))
+				if(!injectorAnn.targetName().equals("") && targetNames.contains(injectorAnn.targetName())) {
+					//case 1: it has a name, try to match it
 					injectionCandidates =
 						injectionCandidates
 							.stream()
 							.filter(i -> i.getSimpleName().toString().equals(injectorAnn.targetName()))
 							.collect(Collectors.toList());
-
-				//case 2: try to match by injectTargetName
-				String inferredName = inj.getSimpleName()
-					.toString()
-					.replaceFirst("inject", "");
-				injectionCandidates =
-					injectionCandidates
-						.stream()
-						.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
-						.collect(Collectors.toList());
-
-				//case 3: there is only one target
-				if(targets.size() == 1)
+				} else if(targets.size() == 1) {
+					//case 2: there is only one target
 					injectionCandidates.add(targets.get(0));
+				} else {
+					//case 3: try to match by injectTargetName
+					String inferredName = inj.getSimpleName()
+						.toString()
+						.replaceFirst("inject", "");
+					injectionCandidates =
+						injectionCandidates
+							.stream()
+							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
+							.collect(Collectors.toList());
+				}
 
 				ExecutableElement injectionTarget = null;
 
 				if(injectionCandidates.size() == 1)
 					injectionTarget = injectionCandidates.get(0);
+				else {
+					List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
 
-				List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
-
-				if(params.size() != 0) {
-					StringBuilder descr = new StringBuilder("(");
-					for(TypeMirror p : params)
-						descr.append(descriptorFromType(TypeName.get(p)));
-					descr.append(")");
-					injectionCandidates =
-						injectionCandidates
-							.stream()
-							.filter(t -> //we care about arguments but not really about return type
+					if(params.size() != 0) {
+						StringBuilder descr = new StringBuilder("(");
+						for(TypeMirror p : params)
+							descr.append(descriptorFromType(TypeName.get(p)));
+						descr.append(")");
+						injectionCandidates =
+							injectionCandidates
+								.stream()
+								.filter(t -> //we care about arguments but not really about return type
 									descr.toString()
 										.split("\\)")[0]
 										.equalsIgnoreCase(descriptorFromExecutableElement(t).split("\\)")[0])
-							).collect(Collectors.toList());
-				}
+								).collect(Collectors.toList());
+					}
 
-				if(injectionCandidates.size() == 1)
-					injectionTarget = injectionCandidates.get(0);
+					if(injectionCandidates.size() == 1)
+						injectionTarget = injectionCandidates.get(0);
+				}
 
 				//if we haven't found it yet, it's an ambiguity
 				if(injectionTarget == null)
 					throw new AmbiguousDefinitionException("Unclear target for injector " + inj.getSimpleName().toString() + "!");
 				else toGenerate.put(
 						cl.getSimpleName().toString() + "Injector" + iterationNumber,
-						new InjectorInfo(
-							inj, findRealMethod(
-								injectionTarget,
-								mapper
-							)
-						)
+						new InjectorInfo(inj, findRealMethod(injectionTarget, mapper))
 					);
 				iterationNumber++;
 			}
