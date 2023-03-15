@@ -1,9 +1,6 @@
 package ftbsc.lll.processor.tools;
 
-import com.squareup.javapoet.ArrayTypeName;
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeName;
+import com.squareup.javapoet.*;
 import ftbsc.lll.tools.DescriptorBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -53,8 +50,8 @@ public class ASTUtils {
 			desc.append("[");
 			type = ((ArrayTypeName) type).componentType;
 		}
-		if(type instanceof ClassName) {
-			ClassName var = (ClassName) type;
+		if(type instanceof ClassName || type instanceof ParameterizedTypeName) {
+			ClassName var = type instanceof ParameterizedTypeName ? ((ParameterizedTypeName) type).rawType : (ClassName) type;
 			desc.append(DescriptorBuilder.nameToDescriptor(var.canonicalName(), 0));
 		} else {
 			if(TypeName.BOOLEAN.equals(type))
