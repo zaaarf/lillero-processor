@@ -183,7 +183,7 @@ public class ObfuscationMapper {
 		public String get(String memberName, String methodDescriptor) {
 			if(methodDescriptor == null)
 				return members.get(memberName);
-			List<String> candidates = members.values().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
+			List<String> candidates = members.keySet().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
 			if(candidates.size() == 1)
 				return members.get(candidates.get(0));
 			String signature = memberName + " " + methodDescriptor;

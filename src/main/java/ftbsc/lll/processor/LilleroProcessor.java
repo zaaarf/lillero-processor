@@ -16,6 +16,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
@@ -153,7 +154,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @since 0.3.0
 	 */
 	private static String findClassName(String name, ObfuscationMapper mapper) {
-		return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
+		try {
+			return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
+		} catch(MappingNotFoundException e) {
+			return name;
+		}
 	}
 
 	/**
@@ -192,7 +197,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @since 0.3.0
 	 */
 	private static String findMemberName(String parentFQN, String memberName, String methodDescriptor, ObfuscationMapper mapper) {
-		return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
+		try {
+			return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
+		} catch(MappingNotFoundException e) {
+			return memberName;
+		}
 	}
 
 	/**
@@ -423,7 +432,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
 			String targetMethodName = findMemberName(targetClassFQN, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
 
-			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).target)
+			MethodSpec stubOverride = unsafeOverriding(toGenerate.get(injName).target)
 				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
 				.build();
 
@@ -488,6 +497,35 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
+	 * Identical to {@link MethodSpec#overriding(ExecutableElement)}, but does not check for
+	 * the accessor level of the target method. May be used to override package-private methods
+	 * that are technically classified as private, but may be accessed under certain conditions.
+	 * @param target the method to override
+	 * @return the built method spec
+	 * @since 0.3.0
+	 * @see MethodSpec#overriding(ExecutableElement)
+	 */
+	private static MethodSpec.Builder unsafeOverriding(ExecutableElement target) {
+		MethodSpec.Builder bd =
+			MethodSpec.methodBuilder(target.getSimpleName().toString())
+				.addAnnotation(Override.class)
+				.addModifiers(target.getModifiers())
+				.returns(TypeName.get(target.getReturnType()));
+		bd.modifiers.remove(Modifier.DEFAULT);
+		bd.modifiers.remove(Modifier.ABSTRACT);
+		for (TypeParameterElement typeParameterElement : target.getTypeParameters()) {
+			TypeVariable var = (TypeVariable) typeParameterElement.asType();
+			bd.addTypeVariable(TypeVariableName.get(var));
+		}
+		for(VariableElement p : target.getParameters())
+			bd.addParameter(TypeName.get(p.asType()), p.getSimpleName().toString(), p.getModifiers().toArray(new Modifier[0]));
+		bd.varargs(target.isVarArgs());
+		for(TypeMirror thrownType : target.getThrownTypes())
+			bd.addException(TypeName.get(thrownType));
+		return bd;
+	}
+
+	/**
 	 * Finds any method annotated with {@link FindMethod} or {@link FindField} within the given
 	 * class, and builds the {@link MethodSpec} necessary for building it.
 	 * @param cl the class to search
@@ -502,7 +540,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
 				ExecutableElement targetMethod = findRealMethodFromStub(m);
-				MethodSpec.Builder b = MethodSpec.overriding(m);
+				MethodSpec.Builder b = unsafeOverriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
 
@@ -531,7 +569,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
 			.forEach(m -> {
 				VariableElement targetField = findField(m);
-				MethodSpec.Builder b = MethodSpec.overriding(m);
+				MethodSpec.Builder b = unsafeOverriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
 
