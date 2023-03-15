@@ -31,7 +31,7 @@ public class ASTUtils {
 	public static List<ExecutableElement> findAnnotatedMethods(TypeElement cl, Class<? extends Annotation> ann) {
 		return cl.getEnclosedElements()
 			.stream()
-			.filter(e -> e.getAnnotation(ann) != null)
+			.filter(e -> e.getAnnotationsByType(ann).length != 0)
 			.map(e -> (ExecutableElement) e)
 			.collect(Collectors.toList());
 	}
