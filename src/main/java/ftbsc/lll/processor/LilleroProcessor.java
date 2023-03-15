@@ -360,7 +360,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		String packageName = packageElement.toString();
 
 		//find injector(s) and target(s)
-		List<ExecutableElement> injectors = findAnnotatedMethods(cl, MultipleInjectors.class);
+		List<ExecutableElement> injectors = findAnnotatedMethods(cl, Injector.class);
 
 		List<ExecutableElement> targets = findAnnotatedMethods(cl, Target.class);
 
@@ -375,9 +375,9 @@ public class LilleroProcessor extends AbstractProcessor {
 		Map<String, InjectorInfo> toGenerate = new HashMap<>();
 
 		for(ExecutableElement inj : injectors) {
-			MultipleInjectors minjAnn = inj.getAnnotation(MultipleInjectors.class);
+			Injector[] minjAnn = inj.getAnnotationsByType(Injector.class);
 			int iterationNumber = 1;
-			for(Injector injectorAnn : minjAnn.value()) { //java is dumb
+			for(Injector injectorAnn : minjAnn) { //java is dumb
 				List<ExecutableElement> injectionCandidates = targets;
 
 				//case 1: it has a name, try to match it
