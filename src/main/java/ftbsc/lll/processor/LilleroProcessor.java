@@ -4,8 +4,6 @@ import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.InvalidResourceException;
-import ftbsc.lll.exceptions.MappingNotFoundException;
-import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.*;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.FieldProxy;
@@ -21,16 +19,15 @@ import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
-import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
 import static ftbsc.lll.processor.tools.ASTUtils.getClassFullyQualifiedName;
+import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
 
 /**
  * The actual annotation processor behind the magic.
@@ -59,6 +56,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param processingEnv environment to access facilities the tool framework
 	 * provides to the processor
 	 * @throws IllegalStateException if this method is called more than once.
+	 * @since 0.3.0
 	 */
 	@Override
 	public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -144,153 +142,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
-		}
-	}
-
-	/**
-	 * Finds the class name and maps it to the correct format.
-	 * @param name the fully qualified name of the class to convert
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
-	 * @return the fully qualified class name
-	 * @since 0.3.0
-	 */
-	private static String findClassName(String name, ObfuscationMapper mapper) {
-		try {
-			return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
-		} catch(MappingNotFoundException e) {
-			return name;
-		}
-	}
-
-	/**
-	 * Finds the class name and maps it to the correct format.
-	 *
-	 * @param patchAnn  the {@link Patch} annotation containing target class info
-	 * @param finderAnn an annotation containing metadata to fall back on, may be null
-	 * @param parentFun the function to get the parent from the finderAnn
-	 * @return the fully qualified class name
-	 * @since 0.3.0
-	 */
-	private static <T extends Annotation> String findClassName(Patch patchAnn, T finderAnn, Function<T, Class<?>> parentFun) {
-		String fullyQualifiedName =
-			finderAnn == null || parentFun.apply(finderAnn) == Object.class
-				? getClassFullyQualifiedName(patchAnn, Patch::value)
-				: getClassFullyQualifiedName(finderAnn, parentFun);
-		return findClassName(fullyQualifiedName, null);
-	}
-
-	/**
-	 * Finds the member name and maps it to the correct format.
-	 * @param parentFQN the already mapped FQN of the parent class
-	 * @param memberName the name of the member
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
-	 * @return the internal class name
-	 * @since 0.3.0
-	 */
-	private static String findMemberName(String parentFQN, String memberName, String methodDescriptor, ObfuscationMapper mapper) {
-		try {
-			return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
-		} catch(MappingNotFoundException e) {
-			return memberName;
-		}
-	}
-
-	/**
-	 * Finds a method given name, container and descriptor.
-	 * @param parentFQN the fully qualified name of the parent class of the method
-	 * @param name the name to search for
-	 * @param descr the descriptor to search for
-	 * @param strict whether the search should be strict (see {@link Target#strict()} for more info)
-	 * @return the desired method, if it exists
-	 * @throws AmbiguousDefinitionException if it finds more than one candidate
-	 * @throws TargetNotFoundException if it finds no valid candidate
-	 * @since 0.3.0
-	 */
-	private ExecutableElement findMethod(String parentFQN, String name, String descr, boolean strict) {
-		TypeElement parent = processingEnv.getElementUtils().getTypeElement(parentFQN);
-		if(parent == null)
-			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", parentFQN));
-
-		//try to find by name
-		List<ExecutableElement> candidates = parent.getEnclosedElements()
-			.stream()
-			.filter(e -> e instanceof ExecutableElement)
-			.map(e -> (ExecutableElement) e)
-			.filter(e -> e.getSimpleName().contentEquals(name))
-			.collect(Collectors.toList());
-		if(candidates.size() == 0)
-			throw new TargetNotFoundException(String.format("%s %s", name, descr));
-		if(candidates.size() == 1 && !strict)
-			return candidates.get(0);
-		if(descr == null) {
-			throw new AmbiguousDefinitionException(
-				String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
-			);
-		} else {
-			candidates = candidates.stream()
-				.filter(strict
-					? c -> descr.equals(descriptorFromExecutableElement(c))
-					: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
-				).collect(Collectors.toList());
-			if(candidates.size() == 0)
-				throw new TargetNotFoundException(String.format("%s %s", name, descr));
-			if(candidates.size() > 1)
-				throw new AmbiguousDefinitionException(
-					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
-				);
-			return candidates.get(0);
-		}
-	}
-
-	/**
-	 * Finds the real class member (field or method) corresponding to a stub annotated with
-	 * {@link Target} or {@link FindMethod} or {@link FindField}.
-	 * @param stub the {@link ExecutableElement} for the stub
-	 * @return the {@link Element} corresponding to the method or field
-	 * @throws AmbiguousDefinitionException if it finds more than one candidate
-	 * @throws TargetNotFoundException if it finds no valid candidate
-	 * @since 0.3.0
-	 */
-	private Element findMemberFromStub(ExecutableElement stub) {
-		//the parent always has a @Patch annotation
-		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
-		//there should ever only be one of these
-		Target targetAnn = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
-		FindMethod findMethodAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
-		FindField findFieldAnn = stub.getAnnotation(FindField.class);
-		String parentFQN, memberName;
-		if(findFieldAnn == null) { //methods
-			parentFQN = findClassName(patchAnn, findMethodAnn, FindMethod::parent);
-			String methodDescriptor =
-				findMethodAnn != null
-					? methodDescriptorFromParams(findMethodAnn, FindMethod::params, processingEnv.getElementUtils())
-					: descriptorFromExecutableElement(stub);
-			memberName =
-				findMethodAnn != null && !findMethodAnn.name().equals("")
-					? findMethodAnn.name()
-					: stub.getSimpleName().toString();
-			return findMethod(
-				parentFQN,
-				memberName,
-				methodDescriptor,
-				targetAnn != null && targetAnn.strict()
-			);
-		} else { //fields
-			parentFQN = findClassName(patchAnn, findFieldAnn, FindField::parent);
-			memberName = findFieldAnn.name().equals("")
-				? stub.getSimpleName().toString()
-				: findFieldAnn.name();
-			TypeElement parent = processingEnv.getElementUtils().getTypeElement(parentFQN);
-			List<VariableElement> candidates =
-				parent.getEnclosedElements()
-					.stream()
-					.filter(f -> f instanceof VariableElement)
-					.filter(f -> f.getSimpleName().contentEquals(memberName))
-					.map(f -> (VariableElement) f)
-					.collect(Collectors.toList());
-			if(candidates.size() == 0)
-				throw new TargetNotFoundException(stub.getSimpleName().toString());
-			else return candidates.get(0); //there can only ever be one
 		}
 	}
 
@@ -449,21 +300,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * Builds a {@link MethodSpec} for a public method whose body simply returns a {@link String}.
-	 * @param name the name of the method
-	 * @param returnString the {@link String} to return
-	 * @return the built {@link MethodSpec}
-	 */
-	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
-		return MethodSpec.methodBuilder(name)
-			.addModifiers(Modifier.PUBLIC)
-			.addAnnotation(Override.class)
-			.returns(String.class)
-			.addStatement("return $S", returnString)
-			.build();
-	}
-
-	/**
 	 * Finds any method annotated with {@link FindMethod} or {@link FindField} within the given
 	 * class, and builds the {@link MethodSpec} necessary for building it.
 	 * @param cl the class to search
@@ -477,7 +313,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
-				ExecutableElement targetMethod = (ExecutableElement) findMemberFromStub(m);
+				ExecutableElement targetMethod = (ExecutableElement) findMemberFromStub(m, processingEnv);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
@@ -506,7 +342,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
 			.forEach(m -> {
-				VariableElement targetField = (VariableElement) findMemberFromStub(m);
+				VariableElement targetField = (VariableElement) findMemberFromStub(m, processingEnv);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
@@ -551,7 +387,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Container for information about a class that is to be generated.
 	 * Only used internally.
 	 */
-	public class InjectorInfo {
+	private class InjectorInfo {
 		/**
 		 * The {@link ExecutableElement} corresponding to the injector method.
 		 */
@@ -575,7 +411,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub) {
 			this.injector = injector;
 			this.targetStub = targetStub;
-			this.target = (ExecutableElement) findMemberFromStub(targetStub);
+			this.target = (ExecutableElement) findMemberFromStub(targetStub, processingEnv);
 		}
 	}
 }

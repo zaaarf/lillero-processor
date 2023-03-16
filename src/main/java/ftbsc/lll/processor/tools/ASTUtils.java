@@ -1,12 +1,17 @@
 package ftbsc.lll.processor.tools;
 
 import com.squareup.javapoet.*;
-import ftbsc.lll.tools.DescriptorBuilder;
+import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.exceptions.MappingNotFoundException;
+import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.processor.annotations.FindField;
+import ftbsc.lll.processor.annotations.FindMethod;
+import ftbsc.lll.processor.annotations.Patch;
+import ftbsc.lll.processor.annotations.Target;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
@@ -18,8 +23,11 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
+import static ftbsc.lll.processor.tools.JavaPoetUtils.methodDescriptorFromParams;
+
 /**
- * Collection of static utils that didn't really fit into the main class.
+ * Collection of AST-related static utils that didn't really fit into the main class.
  */
 public class ASTUtils {
 	/**
@@ -36,67 +44,6 @@ public class ASTUtils {
 			.filter(e -> e.getAnnotationsByType(ann).length != 0)
 			.map(e -> (ExecutableElement) e)
 			.collect(Collectors.toList());
-	}
-
-	/**
-	 * Builds a type descriptor from the given {@link TypeName}.
-	 * @param type the {@link TypeName} representing the desired type
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromType(TypeName type) {
-		StringBuilder desc = new StringBuilder();
-		//add array brackets
-		while(type instanceof ArrayTypeName) {
-			desc.append("[");
-			type = ((ArrayTypeName) type).componentType;
-		}
-		if(type instanceof ClassName || type instanceof ParameterizedTypeName) {
-			ClassName var = type instanceof ParameterizedTypeName ? ((ParameterizedTypeName) type).rawType : (ClassName) type;
-			desc.append(DescriptorBuilder.nameToDescriptor(var.canonicalName(), 0));
-		} else {
-			if(TypeName.BOOLEAN.equals(type))
-				desc.append("Z");
-			else if(TypeName.CHAR.equals(type))
-				desc.append("C");
-			else if(TypeName.BYTE.equals(type))
-				desc.append("B");
-			else if(TypeName.SHORT.equals(type))
-				desc.append("S");
-			else if(TypeName.INT.equals(type))
-				desc.append("I");
-			else if(TypeName.FLOAT.equals(type))
-				desc.append("F");
-			else if(TypeName.LONG.equals(type))
-				desc.append("J");
-			else if(TypeName.DOUBLE.equals(type))
-				desc.append("D");
-			else if(TypeName.VOID.equals(type))
-				desc.append("V");
-		}
-		return desc.toString();
-	}
-
-	/**
-	 * Builds a type descriptor from the given {@link TypeMirror}.
-	 * @param t the {@link TypeMirror} representing the desired type
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromType(TypeMirror t) {
-		return descriptorFromType(TypeName.get(t));
-	}
-
-	/**
-	 * Builds a method descriptor from the given {@link ExecutableElement}.
-	 * @param m the {@link ExecutableElement} for the method
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromExecutableElement(ExecutableElement m) {
-		StringBuilder methodSignature = new StringBuilder();
-		methodSignature.append("(");
-		m.getParameters().forEach(p -> methodSignature.append(descriptorFromType(p.asType())));
-		methodSignature.append(")");
-		methodSignature.append(descriptorFromType(m.getReturnType()));
-		return methodSignature.toString();
 	}
 
 	/**
@@ -172,18 +119,154 @@ public class ASTUtils {
 		return params;
 	}
 
+
 	/**
-	 * Builds a (partial, not including the return type) method descriptor from its parameters
-	 * @param ann the annotation containing the class
-	 * @param fun the annotation function returning the class
-	 * @return the method descriptor
+	 * Finds the class name and maps it to the correct format.
+	 * @param name the fully qualified name of the class to convert
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @return the fully qualified class name
+	 * @since 0.3.0
 	 */
-	public static <T extends Annotation> String methodDescriptorFromParams(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {
-		List<TypeMirror> mirrors = classArrayFromAnnotation(ann, fun, elementUtils);
-		StringBuilder sb = new StringBuilder("(");
-		for(TypeMirror t : mirrors)
-			sb.append(descriptorFromType(t));
-		sb.append(")");
-		return sb.toString();
+	public static String findClassName(String name, ObfuscationMapper mapper) {
+		try {
+			return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
+		} catch(MappingNotFoundException e) {
+			return name;
+		}
+	}
+
+	/**
+	 * Finds the class name and maps it to the correct format.
+	 *
+	 * @param patchAnn  the {@link Patch} annotation containing target class info
+	 * @param finderAnn an annotation containing metadata to fall back on, may be null
+	 * @param parentFun the function to get the parent from the finderAnn
+	 * @return the fully qualified class name
+	 * @since 0.3.0
+	 */
+	private static <T extends Annotation> String findClassName(Patch patchAnn, T finderAnn, Function<T, Class<?>> parentFun) {
+		String fullyQualifiedName =
+			finderAnn == null || parentFun.apply(finderAnn) == Object.class
+				? getClassFullyQualifiedName(patchAnn, Patch::value)
+				: getClassFullyQualifiedName(finderAnn, parentFun);
+		return findClassName(fullyQualifiedName, null);
+	}
+
+	/**
+	 * Finds the member name and maps it to the correct format.
+	 * @param parentFQN the already mapped FQN of the parent class
+	 * @param memberName the name of the member
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @return the internal class name
+	 * @since 0.3.0
+	 */
+	public static String findMemberName(String parentFQN, String memberName, String methodDescriptor, ObfuscationMapper mapper) {
+		try {
+			return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
+		} catch(MappingNotFoundException e) {
+			return memberName;
+		}
+	}
+
+	/**
+	 * Finds a method given name, container and descriptor.
+	 * @param parentFQN the fully qualified name of the parent class of the method
+	 * @param name the name to search for
+	 * @param descr the descriptor to search for
+	 * @param strict whether the search should be strict (see {@link Target#strict()} for more info)
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the desired method, if it exists
+	 * @throws AmbiguousDefinitionException if it finds more than one candidate
+	 * @throws TargetNotFoundException if it finds no valid candidate
+	 * @since 0.3.0
+	 */
+	private static ExecutableElement findMethod(String parentFQN, String name, String descr, boolean strict, ProcessingEnvironment env) {
+		TypeElement parent = env.getElementUtils().getTypeElement(parentFQN);
+		if(parent == null)
+			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", parentFQN));
+
+		//try to find by name
+		List<ExecutableElement> candidates = parent.getEnclosedElements()
+			.stream()
+			.filter(e -> e instanceof ExecutableElement)
+			.map(e -> (ExecutableElement) e)
+			.filter(e -> e.getSimpleName().contentEquals(name))
+			.collect(Collectors.toList());
+		if(candidates.size() == 0)
+			throw new TargetNotFoundException(String.format("%s %s", name, descr));
+		if(candidates.size() == 1 && !strict)
+			return candidates.get(0);
+		if(descr == null) {
+			throw new AmbiguousDefinitionException(
+				String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
+			);
+		} else {
+			candidates = candidates.stream()
+				.filter(strict
+					? c -> descr.equals(descriptorFromExecutableElement(c))
+					: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
+				).collect(Collectors.toList());
+			if(candidates.size() == 0)
+				throw new TargetNotFoundException(String.format("%s %s", name, descr));
+			if(candidates.size() > 1)
+				throw new AmbiguousDefinitionException(
+					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
+				);
+			return candidates.get(0);
+		}
+	}
+
+	/**
+	 * Finds the real class member (field or method) corresponding to a stub annotated with
+	 * {@link Target} or {@link FindMethod} or {@link FindField}.
+	 * @param stub the {@link ExecutableElement} for the stub
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the {@link Element} corresponding to the method or field
+	 * @throws AmbiguousDefinitionException if it finds more than one candidate
+	 * @throws TargetNotFoundException if it finds no valid candidate
+	 * @since 0.3.0
+	 */
+	public static Element findMemberFromStub(ExecutableElement stub, ProcessingEnvironment env) {
+		//the parent always has a @Patch annotation
+		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
+		//there should ever only be one of these
+		Target targetAnn = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
+		FindMethod findMethodAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
+		FindField findFieldAnn = stub.getAnnotation(FindField.class);
+		String parentFQN, memberName;
+		if(findFieldAnn == null) { //methods
+			parentFQN = findClassName(patchAnn, findMethodAnn, FindMethod::parent);
+			String methodDescriptor =
+				findMethodAnn != null
+					? methodDescriptorFromParams(findMethodAnn, FindMethod::params, env.getElementUtils())
+					: descriptorFromExecutableElement(stub);
+			memberName =
+				findMethodAnn != null && !findMethodAnn.name().equals("")
+					? findMethodAnn.name()
+					: stub.getSimpleName().toString();
+			return findMethod(
+				parentFQN,
+				memberName,
+				methodDescriptor,
+				targetAnn != null && targetAnn.strict(),
+				env
+			);
+		} else { //fields
+			parentFQN = findClassName(patchAnn, findFieldAnn, FindField::parent);
+			memberName = findFieldAnn.name().equals("")
+				? stub.getSimpleName().toString()
+				: findFieldAnn.name();
+			TypeElement parent = env.getElementUtils().getTypeElement(parentFQN);
+			List<VariableElement> candidates =
+				parent.getEnclosedElements()
+					.stream()
+					.filter(f -> f instanceof VariableElement)
+					.filter(f -> f.getSimpleName().contentEquals(memberName))
+					.map(f -> (VariableElement) f)
+					.collect(Collectors.toList());
+			if(candidates.size() == 0)
+				throw new TargetNotFoundException(stub.getSimpleName().toString());
+			else return candidates.get(0); //there can only ever be one
+		}
 	}
 }
