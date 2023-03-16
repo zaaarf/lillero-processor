@@ -16,16 +16,17 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
+import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
@@ -101,7 +102,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		for (TypeElement annotation : annotations) {
-			if(annotation.getQualifiedName().toString().equals(Patch.class.getName())) {
+			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				Set<TypeElement> validInjectors =
 					roundEnv.getElementsAnnotatedWith(annotation)
 						.stream()
@@ -163,29 +164,19 @@ public class LilleroProcessor extends AbstractProcessor {
 
 	/**
 	 * Finds the class name and maps it to the correct format.
-	 * @param patchAnn the {@link Patch} annotation containing target class info
-	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 *
+	 * @param patchAnn  the {@link Patch} annotation containing target class info
+	 * @param finderAnn an annotation containing metadata to fall back on, may be null
+	 * @param parentFun the function to get the parent from the finderAnn
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
-	private static String findClassName(Patch patchAnn, FindMethod methodAnn, ObfuscationMapper mapper) {
+	private static <T extends Annotation> String findClassName(Patch patchAnn, T finderAnn, Function<T, Class<?>> parentFun) {
 		String fullyQualifiedName =
-			methodAnn == null || methodAnn.parent() == Object.class
+			finderAnn == null || parentFun.apply(finderAnn) == Object.class
 				? getClassFullyQualifiedName(patchAnn, Patch::value)
-				: getClassFullyQualifiedName(methodAnn, FindMethod::parent);
-		return findClassName(fullyQualifiedName, mapper);
-	}
-
-	/**
-	 * Finds the class name and maps it to the correct format.
-	 * @param patchAnn the {@link Patch} annotation containing target class info
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
-	 * @return the internal class name
-	 * @since 0.3.0
-	 */
-	private static String findClassName(Patch patchAnn, ObfuscationMapper mapper) {
-		return findClassName(patchAnn, null, mapper);
+				: getClassFullyQualifiedName(finderAnn, parentFun);
+		return findClassName(fullyQualifiedName, null);
 	}
 
 	/**
@@ -205,34 +196,8 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * Finds the method name and maps it to the correct format.
-	 *
-	 * @param parentFQN the already mapped FQN of the parent class
-	 * @param methodAnn the {@link FindMethod} annotation to fall back on, may be null
-	 * @param stub      the {@link ExecutableElement} for the stub
-	 * @return the internal class name
-	 * @since 0.3.0
-	 */
-	private String findMethodName(String parentFQN, FindMethod methodAnn, ExecutableElement stub) {
-		String methodName = methodAnn == null ? stub.getSimpleName().toString() : methodAnn.name();
-		String methodDescriptor;
-		if(methodAnn == null)
-			methodDescriptor = descriptorFromExecutableElement(stub);
-		else methodDescriptor = methodDescriptorFromParams(methodAnn, FindMethod::params, processingEnv.getElementUtils());
-		try {
-			methodName = findMemberName(parentFQN, methodName, methodDescriptor, null);
-		} catch(MappingNotFoundException e) {
-			//not found: try again with the name of the annotated method
-			if(methodAnn == null) {
-				methodName = findMemberName(parentFQN, stub.getSimpleName().toString(), methodDescriptor, null);
-			} else throw e;
-		}
-		return methodName;
-	}
-
-	/**
 	 * Finds a method given name, container and descriptor.
-	 * @param fullyQualifiedNameParent the fully qualified name of the parent class of the method
+	 * @param parentFQN the fully qualified name of the parent class of the method
 	 * @param name the name to search for
 	 * @param descr the descriptor to search for
 	 * @param strict whether the search should be strict (see {@link Target#strict()} for more info)
@@ -241,10 +206,10 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private ExecutableElement findMethod(String fullyQualifiedNameParent, String name, String descr, boolean strict) {
-		TypeElement parent = processingEnv.getElementUtils().getTypeElement(fullyQualifiedNameParent);
+	private ExecutableElement findMethod(String parentFQN, String name, String descr, boolean strict) {
+		TypeElement parent = processingEnv.getElementUtils().getTypeElement(parentFQN);
 		if(parent == null)
-			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", fullyQualifiedNameParent));
+			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", parentFQN));
 
 		//try to find by name
 		List<ExecutableElement> candidates = parent.getEnclosedElements()
@@ -259,7 +224,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			return candidates.get(0);
 		if(descr == null) {
 			throw new AmbiguousDefinitionException(
-				String.format("Found %d methods named %s in class %s!", candidates.size(), name, fullyQualifiedNameParent)
+				String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
 			);
 		} else {
 			candidates = candidates.stream()
@@ -271,62 +236,62 @@ public class LilleroProcessor extends AbstractProcessor {
 				throw new TargetNotFoundException(String.format("%s %s", name, descr));
 			if(candidates.size() > 1)
 				throw new AmbiguousDefinitionException(
-					String.format("Found %d methods named %s in class %s!", candidates.size(), name, fullyQualifiedNameParent)
+					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
 				);
 			return candidates.get(0);
 		}
 	}
 
 	/**
-	 * Finds the real method corresponding to a stub.
+	 * Finds the real class member (field or method) corresponding to a stub annotated with
+	 * {@link Target} or {@link FindMethod} or {@link FindField}.
 	 * @param stub the {@link ExecutableElement} for the stub
-	 * @return the desired method, if it exists
+	 * @return the {@link Element} corresponding to the method or field
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private ExecutableElement findRealMethodFromStub(ExecutableElement stub) {
+	private Element findMemberFromStub(ExecutableElement stub) {
+		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
-		FindMethod findAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
-		Target target = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
-		String parentFQN = findClassName(patchAnn, findAnn, null);
-		String methodName = findMethodName(findClassName(patchAnn, findAnn, null), findAnn, stub);
-		return findMethod(
-			parentFQN,
-			methodName,
-			descriptorFromExecutableElement(stub),
-			target != null && target.strict());
-	}
-
-	/**
-	 * Finds the real field corresponding to a stub.
-	 * @param stub the {@link ExecutableElement} for the stub
-	 * @return the desired method, if it exists
-	 * @throws TargetNotFoundException if it finds no valid candidate
-	 * @since 0.3.0
-	 */
-	private VariableElement findField(ExecutableElement stub) {
-		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
-		FindField fieldAnn = stub.getAnnotation(FindField.class);
-		String parentName;
-		if(fieldAnn.parent().equals(Object.class))
-			parentName = getClassFullyQualifiedName(patchAnn, Patch::value);
-		else parentName = getClassFullyQualifiedName(fieldAnn, FindField::parent);
-		parentName = findClassName(parentName, null);
-		String name = fieldAnn.name().equals("")
-			? stub.getSimpleName().toString()
-			: fieldAnn.name();
-		TypeElement parent = processingEnv.getElementUtils().getTypeElement(parentName);
-		List<VariableElement> candidates =
-			parent.getEnclosedElements()
-				.stream()
-				.filter(f -> f instanceof VariableElement)
-				.filter(f -> f.getSimpleName().contentEquals(name))
-				.map(f -> (VariableElement) f)
-				.collect(Collectors.toList());
-		if(candidates.size() == 0)
-			throw new TargetNotFoundException(stub.getSimpleName().toString());
-		else return candidates.get(0); //there can only ever be one
+		//there should ever only be one of these
+		Target targetAnn = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
+		FindMethod findMethodAnn = stub.getAnnotation(FindMethod.class); //this may be null, it means no fallback info
+		FindField findFieldAnn = stub.getAnnotation(FindField.class);
+		String parentFQN, memberName;
+		if(findFieldAnn == null) { //methods
+			parentFQN = findClassName(patchAnn, findMethodAnn, FindMethod::parent);
+			String methodDescriptor =
+				findMethodAnn != null
+					? methodDescriptorFromParams(findMethodAnn, FindMethod::params, processingEnv.getElementUtils())
+					: descriptorFromExecutableElement(stub);
+			memberName =
+				findMethodAnn != null && !findMethodAnn.name().equals("")
+					? findMethodAnn.name()
+					: stub.getSimpleName().toString();
+			return findMethod(
+				parentFQN,
+				memberName,
+				methodDescriptor,
+				targetAnn != null && targetAnn.strict()
+			);
+		} else { //fields
+			parentFQN = findClassName(patchAnn, findFieldAnn, FindField::parent);
+			memberName = findFieldAnn.name().equals("")
+				? stub.getSimpleName().toString()
+				: findFieldAnn.name();
+			TypeElement parent = processingEnv.getElementUtils().getTypeElement(parentFQN);
+			List<VariableElement> candidates =
+				parent.getEnclosedElements()
+					.stream()
+					.filter(f -> f instanceof VariableElement)
+					.filter(f -> f.getSimpleName().contentEquals(memberName))
+					.map(f -> (VariableElement) f)
+					.collect(Collectors.toList());
+			if(candidates.size() == 0)
+				throw new TargetNotFoundException(stub.getSimpleName().toString());
+			else return candidates.get(0); //there can only ever be one
+		}
 	}
 
 	/**
@@ -337,7 +302,9 @@ public class LilleroProcessor extends AbstractProcessor {
 	private void generateInjectors(TypeElement cl) {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
-		String targetClassFQN = findClassName(patchAnn, mapper).replace('/', '.');
+		String targetClassFQN =
+			findClassName(getClassFullyQualifiedName(patchAnn, Patch::value), this.mapper)
+				.replace('/', '.');
 
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -371,7 +338,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					injectionCandidates =
 						injectionCandidates
 							.stream()
-							.filter(i -> i.getSimpleName().toString().equals(injectorAnn.targetName()))
+							.filter(i -> i.getSimpleName().contentEquals(injectorAnn.targetName()))
 							.collect(Collectors.toList());
 				} else if(targets.size() == 1) {
 					//case 2: there is only one target
@@ -432,7 +399,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
 			String targetMethodName = findMemberName(targetClassFQN, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
 
-			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).target)
+			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).targetStub)
 				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
 				.build();
 
@@ -510,7 +477,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
-				ExecutableElement targetMethod = findRealMethodFromStub(m);
+				ExecutableElement targetMethod = (ExecutableElement) findMemberFromStub(m);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
@@ -539,7 +506,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
 			.forEach(m -> {
-				VariableElement targetField = findField(m);
+				VariableElement targetField = (VariableElement) findMemberFromStub(m);
 				MethodSpec.Builder b = MethodSpec.overriding(m);
 
 				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
@@ -553,8 +520,8 @@ public class LilleroProcessor extends AbstractProcessor {
 				b.addStatement("bd.setParent($S)", ((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString());
 
 				for(Modifier mod : targetField.getModifiers())
-
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
+
 				b.addStatement("bd.setType($T.class)", targetField.asType());
 				b.addStatement("return bd.build()");
 
@@ -584,26 +551,31 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Container for information about a class that is to be generated.
 	 * Only used internally.
 	 */
-	private static class InjectorInfo {
+	public class InjectorInfo {
 		/**
 		 * The {@link ExecutableElement} corresponding to the injector method.
 		 */
 		public final ExecutableElement injector;
 
+		/**
+		 * The {@link ExecutableElement} corresponding to the target method stub.
+		 */
+		public final ExecutableElement targetStub;
 
 		/**
 		 * The {@link ExecutableElement} corresponding to the target method.
 		 */
-		public final ExecutableElement target;
+		private final ExecutableElement target;
 
 		/**
 		 * Public constructor.
 		 * @param injector the injector {@link ExecutableElement}
-		 * @param target the target {@link ExecutableElement}
+		 * @param targetStub the target {@link ExecutableElement}
 		 */
-		public InjectorInfo(ExecutableElement injector, ExecutableElement target) {
+		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub) {
 			this.injector = injector;
-			this.target = target;
+			this.targetStub = targetStub;
+			this.target = (ExecutableElement) findMemberFromStub(targetStub);
 		}
 	}
 }
