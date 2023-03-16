@@ -137,18 +137,20 @@ public class ASTUtils {
 
 	/**
 	 * Finds the class name and maps it to the correct format.
-	 *
 	 * @param patchAnn  the {@link Patch} annotation containing target class info
-	 * @param finderAnn an annotation containing metadata to fall back on, may be null
+	 * @param finderAnn an annotation containing metadata about the target, may be null
 	 * @param parentFun the function to get the parent from the finderAnn
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
 	private static <T extends Annotation> String findClassName(Patch patchAnn, T finderAnn, Function<T, Class<?>> parentFun) {
-		String fullyQualifiedName =
-			finderAnn == null || parentFun.apply(finderAnn) == Object.class
-				? getClassFullyQualifiedName(patchAnn, Patch::value)
-				: getClassFullyQualifiedName(finderAnn, parentFun);
+		String fullyQualifiedName;
+		if(finderAnn != null) {
+			fullyQualifiedName = getClassFullyQualifiedName(finderAnn, parentFun);
+			if(!fullyQualifiedName.equals("java.lang.Object"))
+				return findClassName(fullyQualifiedName, null);
+		}
+		fullyQualifiedName = getClassFullyQualifiedName(patchAnn, Patch::value);
 		return findClassName(fullyQualifiedName, null);
 	}
 

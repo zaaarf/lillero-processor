@@ -144,7 +144,6 @@ public class ObfuscationMapper {
 		 */
 		private final Map<String, String> members;
 
-
 		/**
 		 * The constructor. It takes in the names (obfuscated and non-obfuscated)
 		 * of a class.
