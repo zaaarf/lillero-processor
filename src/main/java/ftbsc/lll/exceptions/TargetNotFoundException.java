@@ -10,6 +10,6 @@ public class TargetNotFoundException extends RuntimeException {
 	 * @param stub the stub's name (and descriptor possibly)
 	 */
 	public TargetNotFoundException(String stub) {
-		super(String.format("Could not find member corresponding to stub: %s."));
+		super(String.format("Could not find member corresponding to stub: %s.", stub));
 	}
 }
