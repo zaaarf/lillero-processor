@@ -22,7 +22,7 @@ public @interface Target {
 	 * and to only check parameters if further clarification is needed.
 	 * @implNote While non-strict mode is more computationally efficient, it's ultimately not
 	 *           relevant, as it only matters at compile time. Do not set this to false unless
-	 *           you are sure know what you're doing.
+	 *           you know what you're doing.
 	 * @since 0.3.0
 	 */
 	boolean strict() default true;
