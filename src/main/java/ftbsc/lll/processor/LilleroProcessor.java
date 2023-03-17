@@ -329,8 +329,8 @@ public class LilleroProcessor extends AbstractProcessor {
 				for(Modifier mod : targetMethod.getModifiers())
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
 
-				for(TypeParameterElement p : targetMethod.getTypeParameters())
-					b.addStatement("bd.addParameter($T.class)", p.asType());
+				for(VariableElement p : targetMethod.getParameters())
+					b.addStatement("bd.addParameter($T.class)",p.asType());
 
 				b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
 				b.addStatement("return bd.build()");
