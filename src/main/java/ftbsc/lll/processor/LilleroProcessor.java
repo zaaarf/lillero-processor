@@ -329,10 +329,16 @@ public class LilleroProcessor extends AbstractProcessor {
 				for(Modifier mod : targetMethod.getModifiers())
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
 
-				for(VariableElement p : targetMethod.getParameters())
-					b.addStatement("bd.addParameter($T.class)",p.asType());
+				for(VariableElement p : targetMethod.getParameters()) {
+					if(p.asType().getKind().isPrimitive())
+						b.addStatement("bd.addParameter($T.class)", p.asType());
+					else b.addStatement("bd.addParameter($S)", p.asType().toString());
+				}
 
-				b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
+				if(targetMethod.getReturnType().getKind().isPrimitive())
+					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
+				else b.addStatement("bd.setReturnType($S)", targetMethod.getReturnType().toString());
+
 				b.addStatement("return bd.build()");
 
 				generated.add(b.build());
@@ -358,7 +364,10 @@ public class LilleroProcessor extends AbstractProcessor {
 				for(Modifier mod : targetField.getModifiers())
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
 
-				b.addStatement("bd.setType($T.class)", targetField.asType());
+				if(targetField.asType().getKind().isPrimitive())
+					b.addStatement("bd.setType($T.class)", targetField.asType());
+				else b.addStatement("bd.setType($S)", targetField.asType().toString());
+
 				b.addStatement("return bd.build()");
 
 				generated.add(b.build());
