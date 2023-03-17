@@ -332,12 +332,12 @@ public class LilleroProcessor extends AbstractProcessor {
 				for(VariableElement p : targetMethod.getParameters()) {
 					if(p.asType().getKind().isPrimitive())
 						b.addStatement("bd.addParameter($T.class)", p.asType());
-					else b.addStatement("bd.addParameter($S)", p.asType().toString());
+					else b.addStatement("bd.addParameter($S, %L)", getInnermostComponentType(p.asType()), getArrayLevel(p.asType()));
 				}
 
 				if(targetMethod.getReturnType().getKind().isPrimitive())
 					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
-				else b.addStatement("bd.setReturnType($S)", targetMethod.getReturnType().toString());
+				else b.addStatement("bd.setReturnType($S, %L)", getInnermostComponentType(targetMethod.getReturnType()), getArrayLevel(targetMethod.getReturnType()));
 
 				b.addStatement("return bd.build()");
 
@@ -366,7 +366,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				if(targetField.asType().getKind().isPrimitive())
 					b.addStatement("bd.setType($T.class)", targetField.asType());
-				else b.addStatement("bd.setType($S)", targetField.asType().toString());
+				else b.addStatement("bd.setType($S, %L)", getInnermostComponentType(targetField.asType()), getArrayLevel(targetField.asType()));
 
 				b.addStatement("return bd.build()");
 

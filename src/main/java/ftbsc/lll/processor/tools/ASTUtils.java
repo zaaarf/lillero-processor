@@ -12,9 +12,7 @@ import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
-import javax.lang.model.type.MirroredTypeException;
-import javax.lang.model.type.MirroredTypesException;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -81,6 +79,33 @@ public class ASTUtils {
 			default:
 				return 0;
 		}
+	}
+
+	/**
+	 * Calculates the array nesting level for a {@link TypeMirror}.
+	 * @param t the type mirror to get it for
+	 * @return the array nesting level
+	 * @since 0.3.0
+	 */
+	public static int getArrayLevel(TypeMirror t) {
+		int arrayLevel = 0;
+		while(t.getKind() == TypeKind.ARRAY) {
+			t = ((ArrayType) t).getComponentType();
+			arrayLevel++;
+		}
+		return arrayLevel;
+	}
+
+	/**
+	 * Calculates the array nesting level for a {@link TypeMirror}.
+	 * @param t the type mirror to get it for
+	 * @return the array nesting level
+	 * @since 0.3.0
+	 */
+	public static TypeMirror getInnermostComponentType(TypeMirror t) {
+		while(t.getKind() == TypeKind.ARRAY)
+			t = ((ArrayType) t).getComponentType();
+		return t;
 	}
 
 	/**
