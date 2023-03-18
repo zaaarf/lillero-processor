@@ -10,8 +10,6 @@ import java.lang.annotation.RetentionPolicy;
  * Overrides the marked method in the Injector, having the
  * implementation return a built {@link MethodProxy} with
  * the specified parameters.
- * @implNote if name is omitted, the name of the annotated
- *           method is used.
  * @since 0.2.0
  */
 @Retention(RetentionPolicy.CLASS)
@@ -25,6 +23,8 @@ public @interface FindMethod {
 	Class<?> parent() default Object.class;
 
 	/**
+	 * The name of the method to find. If omitted, the name of the annotated
+	 * method will be used.
 	 * @return the name of the method, will default to the empty string
 	 * (the name of the annotated method will instead be used)
 	 */

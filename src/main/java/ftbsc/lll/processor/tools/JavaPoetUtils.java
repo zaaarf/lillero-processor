@@ -97,6 +97,8 @@ public class JavaPoetUtils {
 	 * Builds a (partial, not including the return type) method descriptor from its parameters
 	 * @param ann the annotation containing the class
 	 * @param fun the annotation function returning the class
+	 * @param elementUtils the {@link Elements} containing utils for the current processing environment
+	 * @param <T> the type of the annotation carrying the information
 	 * @return the method descriptor
 	 */
 	public static <T extends Annotation> String methodDescriptorFromParams(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {

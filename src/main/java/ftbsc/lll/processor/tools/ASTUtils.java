@@ -112,6 +112,7 @@ public class ASTUtils {
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param fun the annotation function returning the class
+	 * @param <T> the type of the annotation carrying the information
 	 * @return the fully qualified name of the given class
 	 * @since 0.3.0
 	 */
@@ -128,6 +129,7 @@ public class ASTUtils {
 	 * @param ann the annotation containing the class
 	 * @param fun the annotation function returning the class
 	 * @param elementUtils the element utils corresponding to the {@link ProcessingEnvironment}
+	 * @param <T> the type of the annotation carrying the information
 	 * @return a list of {@link TypeMirror}s representing the classes
 	 * @since 0.3.0
 	 */
@@ -183,6 +185,7 @@ public class ASTUtils {
 	 * Finds the member name and maps it to the correct format.
 	 * @param parentFQN the already mapped FQN of the parent class
 	 * @param memberName the name of the member
+	 * @param methodDescriptor the descriptor of the method, may be null if it's not a method
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0

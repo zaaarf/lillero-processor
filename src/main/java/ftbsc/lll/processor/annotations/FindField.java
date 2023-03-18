@@ -9,8 +9,6 @@ import java.lang.annotation.RetentionPolicy;
 /**
  * Overrides the marked method in the Injector, having the
  * implementation return a built {@link FieldProxy}.
- * @implNote if name is omitted, name of the annotated method
- *           is used.
  * @since 0.2.0
  */
 @Retention(RetentionPolicy.CLASS)
@@ -24,8 +22,9 @@ public @interface FindField {
 	Class<?> parent() default Object.class;
 
 	/**
+	 * The name of the field to find. If omitted, the name of the annotated
+	 * method will be used.
 	 * @return the name of the field, will default to the empty string
-	 * (the name of the annotated method will instead be used)
 	 */
 	String name() default "";
 }
