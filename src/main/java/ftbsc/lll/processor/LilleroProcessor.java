@@ -341,24 +341,10 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				if(isMethod) {
 					ExecutableElement targetMethod = (ExecutableElement) target;
-					for(VariableElement p : targetMethod.getParameters()) {
-						ArrayContainer param = new ArrayContainer(p.asType());
-						b.addStatement(
-							"bd.addParameter($S, $L)",
-							param.innermostComponent,
-							param.arrayLevel
-						);
-					}
-					ArrayContainer ret = new ArrayContainer(targetMethod.getReturnType());
-					b.addStatement(
-						"bd.setReturnType($S, $L)",
-						ret.innermostComponent,
-						ret.arrayLevel
-					);
-				} else {
-					ArrayContainer arr = new ArrayContainer(target.asType());
-					b.addStatement("bd.setType($S, $L)", arr.innermostComponent, arr.arrayLevel);
-				}
+					for(VariableElement p : targetMethod.getParameters())
+						addTypeToProxyGenerator(b, "bd", "addParameter", p.asType());
+					addTypeToProxyGenerator(b, "bd", "setReturnType", targetMethod.getReturnType());
+				} else addTypeToProxyGenerator(b, "bd", "setType", target.asType());
 
 				b.addStatement("return bd.build()");
 

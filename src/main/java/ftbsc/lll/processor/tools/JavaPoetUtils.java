@@ -2,6 +2,8 @@ package ftbsc.lll.processor.tools;
 
 import com.squareup.javapoet.*;
 import ftbsc.lll.tools.DescriptorBuilder;
+import ftbsc.lll.proxies.MethodProxy;
+import ftbsc.lll.proxies.FieldProxy;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -108,5 +110,29 @@ public class JavaPoetUtils {
 			sb.append(descriptorFromType(t));
 		sb.append(")");
 		return sb.toString();
+	}
+
+	/**
+	 * Adds to the given {@link MethodSpec.Builder} the given line of code,
+	 * containing a call to a method of a {@link MethodProxy.Builder} or a
+	 * {@link FieldProxy.Builder}.
+	 * @param b the {@link MethodSpec.Builder}
+	 * @param proxyBuilderName the name of the proxy builder
+	 * @param proxyBuilderMethod the method to call
+	 * @param t the {@link TypeMirror} to add
+	 * @since 0.4.0
+	 */
+	public static void addTypeToProxyGenerator(MethodSpec.Builder b, String proxyBuilderName, String proxyBuilderMethod, TypeMirror t) {
+		String insn = String.format("%s.%s", proxyBuilderName, proxyBuilderMethod);
+		if(t.getKind().isPrimitive())
+			b.addStatement(insn + "($T.class)", t);
+		else {
+			ArrayContainer arr = new ArrayContainer(t);
+			b.addStatement(
+				insn + "($S, $L)",
+				arr.innermostComponent,
+				arr.arrayLevel
+			);
+		}
 	}
 }
