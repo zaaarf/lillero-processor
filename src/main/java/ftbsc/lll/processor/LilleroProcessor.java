@@ -10,6 +10,7 @@ import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.ArrayContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.proxies.FieldProxy;
 import ftbsc.lll.proxies.MethodProxy;
 
 import javax.annotation.processing.*;
@@ -330,7 +331,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				b.addStatement("$T bd = $T.builder($S)",
 					MethodProxy.Builder.class,
-					MethodProxy.class,
+					isMethod ? MethodProxy.class : FieldProxy.class,
 					findMemberName(targetParentFQN, target.getSimpleName().toString(), methodDescriptor, mapper)
 				);
 
