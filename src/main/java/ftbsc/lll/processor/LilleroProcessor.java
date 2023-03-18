@@ -218,7 +218,6 @@ public class LilleroProcessor extends AbstractProcessor {
 
 				if(injectionCandidates.size() == 1)
 					injectionTarget = injectionCandidates.get(0);
-
 				else {
 					List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
 

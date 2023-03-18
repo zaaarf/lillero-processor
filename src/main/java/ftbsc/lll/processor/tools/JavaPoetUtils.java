@@ -7,7 +7,7 @@ import ftbsc.lll.proxies.FieldProxy;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
@@ -125,7 +125,7 @@ public class JavaPoetUtils {
 	 */
 	public static void addTypeToProxyGenerator(MethodSpec.Builder b, String proxyBuilderName, String proxyBuilderMethod, TypeMirror t) {
 		String insn = String.format("%s.%s", proxyBuilderName, proxyBuilderMethod);
-		if(t.getKind().isPrimitive())
+		if(t.getKind().isPrimitive() || t.getKind() == TypeKind.VOID)
 			b.addStatement(insn + "($T.class)", t);
 		else {
 			ArrayContainer arr = new ArrayContainer(t);
@@ -134,7 +134,7 @@ public class JavaPoetUtils {
 				type = ((ParameterizedTypeName) type).rawType;
 			b.addStatement(
 				insn + "($S, $L)",
-				type,
+				type.toString(),
 				arr.arrayLevel
 			);
 		}
