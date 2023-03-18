@@ -105,13 +105,13 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Extracts
+	 * Extracts the inner class name as a String from the annotation.
 	 * @param ann the annotation containing the class
 	 * @param innerClassFunction the annotation function returning the inner class name
 	 * @param anonymousCounterFunction the annotation function returning the anonymous class counter
 	 * @param <T> the type of the annotation carrying the information
-	 * @return the fully qualified name of the given class
-	 * @since 0.3.0
+	 * @return the name of the inner class, or null if the target isn't an inner class
+	 * @since 0.4.0
 	 */
 	public static <T extends Annotation> String getInnerName(T ann, Function<T, String> innerClassFunction, Function<T, Integer> anonymousCounterFunction) {
 		String inner = null;
