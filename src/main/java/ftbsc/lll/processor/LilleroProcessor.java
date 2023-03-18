@@ -2,33 +2,32 @@ package ftbsc.lll.processor;
 
 import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
+import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.processor.annotations.*;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.FieldProxy;
 import ftbsc.lll.proxies.MethodProxy;
-import ftbsc.lll.tools.SrgMapper;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
-import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import static ftbsc.lll.processor.ASTUtils.*;
+import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.tools.ASTUtils.getClassFullyQualifiedName;
+import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
 
 /**
  * The actual annotation processor behind the magic.
@@ -36,12 +35,57 @@ import static ftbsc.lll.processor.ASTUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
+@SupportedOptions("mappingsFile")
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
 	 * of the generated injector files.
 	 */
 	private final Set<String> generatedInjectors = new HashSet<>();
+
+	/**
+	 * The {@link ObfuscationMapper} used to convert classes and variables
+	 * to their obfuscated equivalent. Will be null when no mapper is in use.
+	 */
+	private ObfuscationMapper mapper;
+
+	/**
+	 * Initializes the processor with the processing environment by
+	 * setting the {@code processingEnv} field to the value of the
+	 * {@code processingEnv} argument.
+	 * @param processingEnv environment to access facilities the tool framework
+	 * provides to the processor
+	 * @throws IllegalStateException if this method is called more than once.
+	 * @since 0.3.0
+	 */
+	@Override
+	public synchronized void init(ProcessingEnvironment processingEnv) {
+		super.init(processingEnv);
+		String location = processingEnv.getOptions().get("mappingsFile");
+		if(location == null)
+			mapper = null;
+		else {
+			InputStream targetStream;
+			try {
+				URI target = new URI(location);
+				targetStream = target.toURL().openStream();
+			} catch(URISyntaxException | IOException e) {
+				//may be a local file path
+				File f = new File(location);
+				if(!f.exists())
+					throw new InvalidResourceException(location);
+				try {
+					targetStream = new FileInputStream(f);
+				} catch(FileNotFoundException ex) {
+					throw new InvalidResourceException(location);
+				}
+			}
+			//assuming its tsrg file
+			//todo: replace crappy homebaked parser with actual library
+			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
+				StandardCharsets.UTF_8)).lines());
+		}
+	}
 
 	/**
 	 * Where the actual processing happens.
@@ -56,7 +100,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		for (TypeElement annotation : annotations) {
-			if(annotation.getQualifiedName().toString().equals(Patch.class.getName())) {
+			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				Set<TypeElement> validInjectors =
 					roundEnv.getElementsAnnotatedWith(annotation)
 						.stream()
@@ -64,7 +108,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						.filter(this::isValidInjector)
 						.collect(Collectors.toSet());
 				if(!validInjectors.isEmpty()) {
-					validInjectors.forEach(this::generateInjector);
+					validInjectors.forEach(this::generateInjectors);
 					if (!this.generatedInjectors.isEmpty()) {
 						generateServiceProvider();
 						return true;
@@ -96,114 +140,163 @@ public class LilleroProcessor extends AbstractProcessor {
 		})) return true;
 		else {
 			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-				"Missing valid @Injector method in @Patch class " + elem + ", skipping.");
+				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
 	}
 
 	/**
-	 * Generates the Injector corresponding to the given class.
+	 * Generates the Injector(s) contained in the given class.
 	 * Basically implements the {@link IInjector} interface for you.
 	 * @param cl the {@link TypeElement} for the given class
 	 */
-	private void generateInjector(TypeElement cl) {
-		SrgMapper mapper;
-		try { //TODO: cant we get it from local?
-			URL url = new URL("https://data.fantabos.co/output.tsrg");
-			InputStream is = url.openStream();
-			mapper = new SrgMapper(new BufferedReader(new InputStreamReader(is,
-				StandardCharsets.UTF_8)).lines());
-			is.close();
-		} catch(IOException e) {
-			throw new RuntimeException("Could not open the specified TSRG file!", e);
-		}
+	private void generateInjectors(TypeElement cl) {
+		//find class information
+		Patch patchAnn = cl.getAnnotation(Patch.class);
+		String targetClassFQN =
+			findClassName(getClassFullyQualifiedName(patchAnn, Patch::value), this.mapper)
+				.replace('/', '.');
 
-		Patch ann = cl.getAnnotation(Patch.class);
-		String targetClassCanonicalName;
-		try {
-			targetClassCanonicalName = ann.value().getCanonicalName();
-		} catch(MirroredTypeException e) {
-			targetClassCanonicalName = e.getTypeMirror().toString();
-		} //pretty sure class names de facto never change but better safe than sorry
-		String targetClassSrgName = mapper.getMcpClass(targetClassCanonicalName.replace('.', '/'));
-
-		ExecutableElement targetMethod = findAnnotatedMethods(cl, Target.class).get(0); //there should only be one
-		String targetMethodDescriptor = descriptorFromMethodSpec(targetMethod);
-		String targetMethodSrgName = mapper.getSrgMember(
-			targetClassCanonicalName.replace('.', '/'),
-			targetMethod.getSimpleName() + " " + targetMethodDescriptor
-		);
-
-		ExecutableElement injectorMethod = findAnnotatedMethods(cl, Injector.class).get(0); //there should only be one
-
+		//find package information
 		Element packageElement = cl.getEnclosingElement();
 		while (packageElement.getKind() != ElementKind.PACKAGE)
 			packageElement = packageElement.getEnclosingElement();
-
 		String packageName = packageElement.toString();
-		String injectorSimpleClassName = cl.getSimpleName().toString() + "Injector";
-		String injectorClassName = packageName + "." + injectorSimpleClassName;
 
-		MethodSpec stubOverride = MethodSpec.overriding(targetMethod)
-			.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
-			.build();
+		//find injector(s) and target(s)
+		List<ExecutableElement> injectors = findAnnotatedMethods(cl, Injector.class);
 
-		MethodSpec inject = MethodSpec.methodBuilder("inject")
-			.addModifiers(Modifier.PUBLIC)
-			.returns(void.class)
-			.addAnnotation(Override.class)
-			.addParameter(ParameterSpec.builder(
-				TypeName.get(processingEnv
-					.getElementUtils()
-					.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz").build())
-			.addParameter(ParameterSpec.builder(
-				TypeName.get(processingEnv
-					.getElementUtils()
-					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main").build())
-			.addStatement("super." + injectorMethod.getSimpleName() + "(clazz, main)", TypeName.get(cl.asType()))
-			.build();
+		List<ExecutableElement> targets = findAnnotatedMethods(cl, Target.class);
 
-		TypeSpec injectorClass = TypeSpec.classBuilder(injectorSimpleClassName)
-			.addModifiers(Modifier.PUBLIC)
-			.superclass(cl.asType())
-			.addSuperinterface(ClassName.get(IInjector.class))
-			.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
-			.addMethod(buildStringReturnMethod("reason", ann.reason()))
-			.addMethod(buildStringReturnMethod("targetClass", targetClassSrgName.replace('/', '.')))
-			.addMethod(buildStringReturnMethod("methodName", targetMethodSrgName))
-			.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
-			.addMethods(generateRequestedProxies(cl, mapper))
-			.addMethod(stubOverride)
-			.addMethod(inject)
-			.build();
+		//declare it once for efficiency
+		List<String> targetNames =
+			targets.stream()
+				.map(ExecutableElement::getSimpleName)
+				.map(Object::toString)
+				.collect(Collectors.toList());
 
-		JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
+		//this will contain the classes to generate: the key is the class name
+		Map<String, InjectorInfo> toGenerate = new HashMap<>();
 
-		try {
-			JavaFileObject injectorFile = processingEnv.getFiler().createSourceFile(injectorClassName);
-			PrintWriter out = new PrintWriter(injectorFile.openWriter());
-			javaFile.writeTo(out);
-			out.close();
-		} catch(IOException e) {
-			throw new RuntimeException(e);
+		for(ExecutableElement inj : injectors) {
+			Injector[] minjAnn = inj.getAnnotationsByType(Injector.class);
+			int iterationNumber = 1;
+			for(Injector injectorAnn : minjAnn) { //java is dumb
+				List<ExecutableElement> injectionCandidates = targets;
+
+				if(!injectorAnn.targetName().equals("") && targetNames.contains(injectorAnn.targetName())) {
+					//case 1: it has a name, try to match it
+					injectionCandidates =
+						injectionCandidates
+							.stream()
+							.filter(i -> i.getSimpleName().contentEquals(injectorAnn.targetName()))
+							.collect(Collectors.toList());
+				} else if(targets.size() == 1) {
+					//case 2: there is only one target
+					injectionCandidates = new ArrayList<>();
+					injectionCandidates.add(targets.get(0));
+				} else {
+					//case 3: try to match by injectTargetName
+					String inferredName = inj.getSimpleName()
+						.toString()
+						.replaceFirst("inject", "");
+					injectionCandidates =
+						injectionCandidates
+							.stream()
+							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
+							.collect(Collectors.toList());
+				}
+
+				ExecutableElement injectionTarget = null;
+
+				if(injectionCandidates.size() == 1)
+					injectionTarget = injectionCandidates.get(0);
+
+				else {
+					List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
+
+					if(params.size() != 0) {
+						StringBuilder descr = new StringBuilder("(");
+						for(TypeMirror p : params)
+							descr.append(descriptorFromType(TypeName.get(p)));
+						descr.append(")");
+						injectionCandidates =
+							injectionCandidates
+								.stream()
+								.filter(t -> //we care about arguments but not really about return type
+									descr.toString()
+										.split("\\)")[0]
+										.equalsIgnoreCase(descriptorFromExecutableElement(t).split("\\)")[0])
+								).collect(Collectors.toList());
+					}
+
+					if(injectionCandidates.size() == 1)
+						injectionTarget = injectionCandidates.get(0);
+				}
+
+				//if we haven't found it yet, it's an ambiguity
+				if(injectionTarget == null)
+					throw new AmbiguousDefinitionException(String.format("Unclear target for injector %s::%s!", cl.getSimpleName(), inj.getSimpleName()));
+				else toGenerate.put(
+						String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
+						new InjectorInfo(inj, injectionTarget)
+					);
+				iterationNumber++;
+			}
 		}
 
-		this.generatedInjectors.add(injectorClassName);
-	}
+		//iterate over the map and generate the classes
+		for(String injName : toGenerate.keySet()) {
+			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
+			String targetMethodName = findMemberName(targetClassFQN, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
 
-	/**
-	 * Builds a {@link MethodSpec} for a public method whose body simply returns a {@link String}.
-	 * @param name the name of the method
-	 * @param returnString the {@link String} to return
-	 * @return the built {@link MethodSpec}
-	 */
-	private static MethodSpec buildStringReturnMethod(String name, String returnString) {
-		return MethodSpec.methodBuilder(name)
-			.addModifiers(Modifier.PUBLIC)
-			.addAnnotation(Override.class)
-			.returns(String.class)
-			.addStatement("return $S", returnString)
-			.build();
+			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).targetStub)
+				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
+				.build();
+
+			MethodSpec inject = MethodSpec.methodBuilder("inject")
+				.addModifiers(Modifier.PUBLIC)
+				.returns(void.class)
+				.addAnnotation(Override.class)
+				.addParameter(ParameterSpec.builder(
+					TypeName.get(processingEnv
+						.getElementUtils()
+						.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz").build())
+				.addParameter(ParameterSpec.builder(
+					TypeName.get(processingEnv
+						.getElementUtils()
+						.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main").build())
+				.addStatement(String.format("super.%s(clazz, main)", toGenerate.get(injName).injector.getSimpleName()), TypeName.get(cl.asType()))
+				.build();
+
+			TypeSpec injectorClass = TypeSpec.classBuilder(injName)
+				.addModifiers(Modifier.PUBLIC)
+				.superclass(cl.asType())
+				.addSuperinterface(ClassName.get(IInjector.class))
+				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
+				.addMethod(buildStringReturnMethod("reason", patchAnn.reason()))
+				.addMethod(buildStringReturnMethod("targetClass", targetClassFQN))
+				.addMethod(buildStringReturnMethod("methodName", targetMethodName))
+				.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
+				.addMethods(generateRequestedProxies(cl, this.mapper))
+				.addMethod(stubOverride)
+				.addMethod(inject)
+				.build();
+
+			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
+			String injectorClassName = String.format("%s.%s", packageName, injName);
+
+			try {
+				JavaFileObject injectorFile = processingEnv.getFiler().createSourceFile(injectorClassName);
+				PrintWriter out = new PrintWriter(injectorFile.openWriter());
+				javaFile.writeTo(out);
+				out.close();
+			} catch(IOException e) {
+				throw new RuntimeException(e);
+			}
+
+			this.generatedInjectors.add(injectorClassName);
+		}
 	}
 
 	/**
@@ -213,70 +306,74 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return a {@link List} of method specs
 	 * @since 0.2.0
 	 */
-	private List<MethodSpec> generateRequestedProxies(TypeElement cl, SrgMapper mapper) {
+	private List<MethodSpec> generateRequestedProxies(TypeElement cl, ObfuscationMapper mapper) {
 		List<MethodSpec> generated = new ArrayList<>();
 		findAnnotatedMethods(cl, FindMethod.class)
 			.stream()
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
-				FindMethod ann = m.getAnnotation(FindMethod.class);
-				String targetMethodName = ann.name().equals("") ? m.getSimpleName().toString() : ann.name();
-				try {
-					MethodSpec.Builder b = MethodSpec.overriding(m);
-					Method targetMethod = ann.parent().getMethod(
-						targetMethodName,
-						ann.params()
-					);
-					b.addStatement("$T bd = $T.builder($S)",
-						MethodProxy.Builder.class,
-						MethodProxy.class,
-						targetMethodName
-					);
-					b.addStatement("bd.setParent($S)", targetMethod.getDeclaringClass().getCanonicalName());
-					b.addStatement("bd.setModifier($L)", targetMethod.getModifiers());
-					for(Class<?> p : targetMethod.getParameterTypes())
-						b.addStatement("bd.addParameter($T.class)", p);
-					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
-					b.addStatement("return bd.build()");
-					generated.add(b.build());
-				} catch(NoSuchMethodException e) {
-					processingEnv.getMessager().printMessage(
-						Diagnostic.Kind.ERROR,
-						"Method not found: " + targetMethodName
-					);
+				ExecutableElement targetMethod = (ExecutableElement) findMemberFromStub(m, processingEnv);
+				MethodSpec.Builder b = MethodSpec.overriding(m);
+
+				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
+
+				b.addStatement("$T bd = $T.builder($S)",
+					MethodProxy.Builder.class,
+					MethodProxy.class,
+					findMemberName(targetParentFQN, targetMethod.getSimpleName().toString(), descriptorFromExecutableElement(targetMethod), mapper)
+				);
+
+				b.addStatement("bd.setParent($S)", targetParentFQN);
+
+				for(Modifier mod : targetMethod.getModifiers())
+					b.addStatement("bd.addModifier($L)", mapModifier(mod));
+
+				for(VariableElement p : targetMethod.getParameters()) {
+					if(p.asType().getKind().isPrimitive())
+						b.addStatement("bd.addParameter($T.class)", p.asType());
+					else b.addStatement("bd.addParameter($S, $L)", getInnermostComponentType(p.asType()), getArrayLevel(p.asType()));
 				}
+
+				if(targetMethod.getReturnType().getKind().isPrimitive())
+					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
+				else b.addStatement("bd.setReturnType($S, $L)", getInnermostComponentType(targetMethod.getReturnType()), getArrayLevel(targetMethod.getReturnType()));
+
+				b.addStatement("return bd.build()");
+
+				generated.add(b.build());
 			});
 		findAnnotatedMethods(cl, FindField.class)
 			.stream()
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
 			.forEach(m -> {
-				FindField ann = m.getAnnotation(FindField.class);
-				String targetFieldName = ann.name().equals("") ? m.getSimpleName().toString() : ann.name();
-				try {
-					MethodSpec.Builder b = MethodSpec.overriding(m);
-					Field targetField = ann.parent().getField(targetFieldName);
-					b.addStatement("$T bd = $T.builder($S)",
-						FieldProxy.Builder.class,
-						FieldProxy.class,
-						targetFieldName
-					);
-					b.addStatement("bd.setParent($S)", targetField.getDeclaringClass().getCanonicalName());
-					b.addStatement("bd.setModifier($L)", targetField.getModifiers());
-					b.addStatement("bd.setType($T.class)", targetField.getType());
-					b.addStatement("return bd.build()");
-					generated.add(b.build());
-				} catch(NoSuchFieldException e) {
-					processingEnv.getMessager().printMessage(
-						Diagnostic.Kind.ERROR,
-						"Field not found: " + targetFieldName + " in class " + ann.parent().getCanonicalName()
-					);
-				}
+				VariableElement targetField = (VariableElement) findMemberFromStub(m, processingEnv);
+				MethodSpec.Builder b = MethodSpec.overriding(m);
+
+				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
+
+				b.addStatement("$T bd = $T.builder($S)",
+					FieldProxy.Builder.class,
+					FieldProxy.class,
+					findMemberName(targetParentFQN, targetField.getSimpleName().toString(), null, mapper)
+				);
+
+				b.addStatement("bd.setParent($S)", ((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString());
+
+				for(Modifier mod : targetField.getModifiers())
+					b.addStatement("bd.addModifier($L)", mapModifier(mod));
+
+				if(targetField.asType().getKind().isPrimitive())
+					b.addStatement("bd.setType($T.class)", targetField.asType());
+				else b.addStatement("bd.setType($S, $L)", getInnermostComponentType(targetField.asType()), getArrayLevel(targetField.asType()));
+
+				b.addStatement("return bd.build()");
+
+				generated.add(b.build());
 			});
 		return generated;
 	}
-
 
 	/**
 	 * Generates the Service Provider file for the generated injectors.
@@ -292,6 +389,38 @@ public class LilleroProcessor extends AbstractProcessor {
 			out.close();
 		} catch(IOException e) {
 			throw new RuntimeException(e);
+		}
+	}
+
+	/**
+	 * Container for information about a class that is to be generated.
+	 * Only used internally.
+	 */
+	private class InjectorInfo {
+		/**
+		 * The {@link ExecutableElement} corresponding to the injector method.
+		 */
+		public final ExecutableElement injector;
+
+		/**
+		 * The {@link ExecutableElement} corresponding to the target method stub.
+		 */
+		public final ExecutableElement targetStub;
+
+		/**
+		 * The {@link ExecutableElement} corresponding to the target method.
+		 */
+		private final ExecutableElement target;
+
+		/**
+		 * Public constructor.
+		 * @param injector the injector {@link ExecutableElement}
+		 * @param targetStub the target {@link ExecutableElement}
+		 */
+		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub) {
+			this.injector = injector;
+			this.targetStub = targetStub;
+			this.target = (ExecutableElement) findMemberFromStub(targetStub, processingEnv);
 		}
 	}
 }

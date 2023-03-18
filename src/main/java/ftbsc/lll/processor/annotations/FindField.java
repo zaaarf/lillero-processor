@@ -16,6 +16,16 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface FindField {
-	Class<?> parent();
+	/**
+	 * @return the {@link Class} object containing the desired field,
+	 * or the {@link Object} class if not specified (the {@link Class}
+	 * from {@link Patch#value()} is instead used)
+	 */
+	Class<?> parent() default Object.class;
+
+	/**
+	 * @return the name of the field, will default to the empty string
+	 * (the name of the annotated method will instead be used)
+	 */
 	String name() default "";
 }

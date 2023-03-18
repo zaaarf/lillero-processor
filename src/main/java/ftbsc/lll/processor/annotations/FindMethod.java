@@ -17,7 +17,23 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface FindMethod {
-	Class<?> parent();
+	/**
+	 * @return the {@link Class} object containing the desired method,
+	 * or the {@link Object} class if not specified (the {@link Class}
+	 * from {@link Patch#value()} is instead used)
+	 */
+	Class<?> parent() default Object.class;
+
+	/**
+	 * @return the name of the method, will default to the empty string
+	 * (the name of the annotated method will instead be used)
+	 */
 	String name() default "";
-	Class<?>[] params();
+
+	/**
+	 * @return a list of the parameters of the method, will default to empty
+	 * array (in that case, an attempt will be made to match a method without
+	 * args first)
+	 */
+	Class<?>[] params() default {};
 }

@@ -15,4 +15,15 @@ import java.lang.annotation.RetentionPolicy;
  */
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
-public @interface Target {}
+public @interface Target {
+
+	/**
+	 * When set to false, tells the processor to first try to match a single method by name,
+	 * and to only check parameters if further clarification is needed.
+	 * @implNote While non-strict mode is more computationally efficient, it's ultimately not
+	 *           relevant, as it only matters at compile time. Do not set this to false unless
+	 *           you know what you're doing.
+	 * @since 0.3.0
+	 */
+	boolean strict() default true;
+}
