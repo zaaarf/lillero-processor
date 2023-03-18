@@ -130,8 +130,6 @@ public class JavaPoetUtils {
 		else {
 			ArrayContainer arr = new ArrayContainer(t);
 			TypeName type = TypeName.get(arr.innermostComponent);
-			while(type instanceof ArrayTypeName)
-				type = ((ArrayTypeName) type).componentType;
 			if(type instanceof ParameterizedTypeName)
 				type = ((ParameterizedTypeName) type).rawType;
 			b.addStatement(
