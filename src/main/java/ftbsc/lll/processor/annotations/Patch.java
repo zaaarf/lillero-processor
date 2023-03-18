@@ -23,4 +23,19 @@ public @interface Patch {
 	 * @return the patching reason, for logging, defaults to "No reason specified."
 	 */
 	String reason() default "No reason specified.";
+
+	/**
+ 	 * @return the name of the inner class that should be targeted,
+	 * defaults to empty string (not an inner class)
+	 * @since 0.4.0
+	 */
+	String innerClass() default "";
+
+	/**
+	 * @return the anonymous class counter (1 for the first, 2 for
+	 * the second, 3 for the third...) for the class that should be
+	 * targeted, defaults to 0 (not an anonymous class)
+	 * @since 0.4.0
+	 */
+	int anonymousClassCounter() default 0;
 }
