@@ -4,7 +4,9 @@ import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.InvalidResourceException;
+import ftbsc.lll.exceptions.NotAProxyException;
 import ftbsc.lll.processor.annotations.*;
+import ftbsc.lll.processor.tools.ArrayContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.FieldProxy;
 import ftbsc.lll.proxies.MethodProxy;
@@ -154,8 +156,13 @@ public class LilleroProcessor extends AbstractProcessor {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		String targetClassFQN =
-			findClassName(getClassFullyQualifiedName(patchAnn, Patch::value), this.mapper)
-				.replace('/', '.');
+			findClassName(
+				getClassFullyQualifiedName(
+					patchAnn,
+					Patch::value,
+					getInnerName(patchAnn, Patch::innerClass, Patch::anonymousClassCounter)
+				), this.mapper
+			).replace('/', '.');
 
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -300,73 +307,58 @@ public class LilleroProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * Finds any method annotated with {@link FindMethod} or {@link FindField} within the given
-	 * class, and builds the {@link MethodSpec} necessary for building it.
+	 * Finds any method annotated with {@link Find} within the given class, generates
+	 * the {@link MethodSpec} necessary for building it.
 	 * @param cl the class to search
 	 * @return a {@link List} of method specs
 	 * @since 0.2.0
 	 */
 	private List<MethodSpec> generateRequestedProxies(TypeElement cl, ObfuscationMapper mapper) {
 		List<MethodSpec> generated = new ArrayList<>();
-		findAnnotatedMethods(cl, FindMethod.class)
+		findAnnotatedMethods(cl, Find.class)
 			.stream()
 			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
 			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
 			.forEach(m -> {
-				ExecutableElement targetMethod = (ExecutableElement) findMemberFromStub(m, processingEnv);
+				boolean isMethod = isMethodProxyStub(m);
+				Element target = findMemberFromStub(m, processingEnv);
+
 				MethodSpec.Builder b = MethodSpec.overriding(m);
 
-				String targetParentFQN = findClassName(((TypeElement) targetMethod.getEnclosingElement()).getQualifiedName().toString(), mapper);
+				String targetParentFQN = findClassName(((TypeElement) target.getEnclosingElement()).getQualifiedName().toString(), mapper);
+				String methodDescriptor = isMethod ? descriptorFromExecutableElement((ExecutableElement) target) : null;
 
 				b.addStatement("$T bd = $T.builder($S)",
 					MethodProxy.Builder.class,
 					MethodProxy.class,
-					findMemberName(targetParentFQN, targetMethod.getSimpleName().toString(), descriptorFromExecutableElement(targetMethod), mapper)
+					findMemberName(targetParentFQN, target.getSimpleName().toString(), methodDescriptor, mapper)
 				);
 
 				b.addStatement("bd.setParent($S)", targetParentFQN);
 
-				for(Modifier mod : targetMethod.getModifiers())
+				for(Modifier mod : target.getModifiers())
 					b.addStatement("bd.addModifier($L)", mapModifier(mod));
 
-				for(VariableElement p : targetMethod.getParameters()) {
-					if(p.asType().getKind().isPrimitive())
-						b.addStatement("bd.addParameter($T.class)", p.asType());
-					else b.addStatement("bd.addParameter($S, $L)", getInnermostComponentType(p.asType()), getArrayLevel(p.asType()));
+				if(isMethod) {
+					ExecutableElement targetMethod = (ExecutableElement) target;
+					for(VariableElement p : targetMethod.getParameters()) {
+						ArrayContainer param = new ArrayContainer(p.asType());
+						b.addStatement(
+							"bd.addParameter($S, $L)",
+							param.innermostComponent,
+							param.arrayLevel
+						);
+					}
+					ArrayContainer ret = new ArrayContainer(targetMethod.getReturnType());
+					b.addStatement(
+						"bd.setReturnType($S, $L)",
+						ret.innermostComponent,
+						ret.arrayLevel
+					);
+				} else {
+					ArrayContainer arr = new ArrayContainer(target.asType());
+					b.addStatement("bd.setType($S, $L)", arr.innermostComponent, arr.arrayLevel);
 				}
-
-				if(targetMethod.getReturnType().getKind().isPrimitive())
-					b.addStatement("bd.setReturnType($T.class)", targetMethod.getReturnType());
-				else b.addStatement("bd.setReturnType($S, $L)", getInnermostComponentType(targetMethod.getReturnType()), getArrayLevel(targetMethod.getReturnType()));
-
-				b.addStatement("return bd.build()");
-
-				generated.add(b.build());
-			});
-		findAnnotatedMethods(cl, FindField.class)
-			.stream()
-			.filter(m -> !m.getModifiers().contains(Modifier.STATIC))
-			.filter(m -> !m.getModifiers().contains(Modifier.FINAL))
-			.forEach(m -> {
-				VariableElement targetField = (VariableElement) findMemberFromStub(m, processingEnv);
-				MethodSpec.Builder b = MethodSpec.overriding(m);
-
-				String targetParentFQN = findClassName(((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString(), mapper);
-
-				b.addStatement("$T bd = $T.builder($S)",
-					FieldProxy.Builder.class,
-					FieldProxy.class,
-					findMemberName(targetParentFQN, targetField.getSimpleName().toString(), null, mapper)
-				);
-
-				b.addStatement("bd.setParent($S)", ((TypeElement) targetField.getEnclosingElement()).getQualifiedName().toString());
-
-				for(Modifier mod : targetField.getModifiers())
-					b.addStatement("bd.addModifier($L)", mapModifier(mod));
-
-				if(targetField.asType().getKind().isPrimitive())
-					b.addStatement("bd.setType($T.class)", targetField.asType());
-				else b.addStatement("bd.setType($S, $L)", getInnermostComponentType(targetField.asType()), getArrayLevel(targetField.asType()));
 
 				b.addStatement("return bd.build()");
 
