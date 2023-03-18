@@ -8,7 +8,6 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.ArrayContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.FieldProxy;
 import ftbsc.lll.proxies.MethodProxy;

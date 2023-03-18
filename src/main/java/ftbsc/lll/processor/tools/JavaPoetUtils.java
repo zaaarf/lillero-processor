@@ -7,6 +7,7 @@ import ftbsc.lll.proxies.FieldProxy;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
@@ -128,9 +129,14 @@ public class JavaPoetUtils {
 			b.addStatement(insn + "($T.class)", t);
 		else {
 			ArrayContainer arr = new ArrayContainer(t);
+			TypeName type = TypeName.get(arr.innermostComponent);
+			while(type instanceof ArrayTypeName)
+				type = ((ArrayTypeName) type).componentType;
+			if(type instanceof ParameterizedTypeName)
+				type = ((ParameterizedTypeName) type).rawType;
 			b.addStatement(
 				insn + "($S, $L)",
-				arr.innermostComponent,
+				type,
 				arr.arrayLevel
 			);
 		}
