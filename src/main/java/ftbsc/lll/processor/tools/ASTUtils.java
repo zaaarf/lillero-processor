@@ -287,7 +287,7 @@ public class ASTUtils {
 			memberName,
 			methodDescriptor,
 			targetAnn != null && targetAnn.strict(),
-			!isMethodProxyStub(stub),
+			targetAnn == null && !isMethodProxyStub(stub), //only evaluate if target is null
 			env
 		);
 	}
