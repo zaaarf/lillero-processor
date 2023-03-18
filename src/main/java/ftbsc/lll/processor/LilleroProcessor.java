@@ -330,7 +330,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				String methodDescriptor = isMethod ? descriptorFromExecutableElement((ExecutableElement) target) : null;
 
 				b.addStatement("$T bd = $T.builder($S)",
-					MethodProxy.Builder.class,
+					isMethod ? MethodProxy.Builder.class : FieldProxy.Builder.class,
 					isMethod ? MethodProxy.class : FieldProxy.class,
 					findMemberName(targetParentFQN, target.getSimpleName().toString(), methodDescriptor, mapper)
 				);
