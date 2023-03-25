@@ -13,7 +13,9 @@ import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.MirroredTypesException;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -122,29 +124,6 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Safely extracts a {@link Class} array from an annotation.
-	 * @param ann the annotation containing the class
-	 * @param fun the annotation function returning the class
-	 * @param elementUtils the element utils corresponding to the {@link ProcessingEnvironment}
-	 * @param <T> the type of the annotation carrying the information
-	 * @return a list of {@link TypeMirror}s representing the classes
-	 * @since 0.3.0
-	 */
-	public static <T extends Annotation> List<TypeMirror> classArrayFromAnnotation(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {
-		List<TypeMirror> params = new ArrayList<>();
-		try {
-			params.addAll(Arrays.stream(fun.apply(ann))
-				.map(Class::getCanonicalName)
-				.map(fqn -> elementUtils.getTypeElement(fqn).asType())
-				.collect(Collectors.toList()));
-		} catch(MirroredTypesException e) {
-			params.addAll(e.getTypeMirrors());
-		}
-		return params;
-	}
-
-
-	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param name the fully qualified name of the class to convert
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
@@ -164,12 +143,11 @@ public class ASTUtils {
 	 * @param fallback  the (unobfuscated) FQN to fall back on
 	 * @param finderAnn an annotation containing metadata about the target, may be null
 	 * @return the fully qualified class name
-	 * @since 0.3.0
+	 * @since 0.5.0
 	 */
 	public static String findClassNameFromAnnotations(String fallback, Find finderAnn) {
-		String fullyQualifiedName;
 		if(finderAnn != null) {
-			fullyQualifiedName =
+			String fullyQualifiedName =
 				getClassFullyQualifiedName(
 					finderAnn,
 					Find::value,
@@ -194,7 +172,7 @@ public class ASTUtils {
 				patchAnn,
 				Patch::value,
 				patchAnn.className()
-			), null);
+			), finderAnn);
 	}
 
 	/**
@@ -238,8 +216,9 @@ public class ASTUtils {
 			.filter(e -> (field && e instanceof VariableElement) || e instanceof ExecutableElement)
 			.filter(e -> e.getSimpleName().contentEquals(name))
 			.collect(Collectors.toList());
+
 		if(candidates.size() == 0)
-			throw new TargetNotFoundException(field ? "field" : "method", String.format("%s %s", name, descr));
+			throw new TargetNotFoundException(field ? "field" : "method", name, parentFQN);
 		if(candidates.size() == 1 && (!strict || field))
 			return candidates.get(0);
 		if(field || descr == null) {
@@ -254,7 +233,7 @@ public class ASTUtils {
 					: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
 				).collect(Collectors.toList());
 			if(candidates.size() == 0)
-				throw new TargetNotFoundException("method", String.format("%s %s", name, descr));
+				throw new TargetNotFoundException("method", String.format("%s %s", name, descr), parentFQN);
 			if(candidates.size() > 1)
 				throw new AmbiguousDefinitionException(
 					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
@@ -266,22 +245,20 @@ public class ASTUtils {
 	/**
 	 * Finds the real class method corresponding to a stub annotated with {@link Target}.
 	 * @param stub the {@link ExecutableElement} for the stub
+	 * @param f the {@link Find} annotation containing fallback data, may be null
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @return the {@link ExecutableElement} corresponding to the method
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static ExecutableElement findMethodFromStub(ExecutableElement stub, ProcessingEnvironment env) {
+	public static ExecutableElement findMethodFromStub(ExecutableElement stub, Find f, ProcessingEnvironment env) {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		//there should ever only be one of these two
 		Target targetAnn = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
-		Find findAnn = stub.getAnnotation(Find.class); //this may be null, it means no fallback info
-		String parentFQN = findClassNameFromAnnotations(patchAnn, findAnn);
+		String parentFQN = findClassNameFromAnnotations(patchAnn, f);
 		String methodName = stub.getSimpleName().toString();
-		if(findAnn != null && !findAnn.name().equals(""))
-			throw new AmbiguousDefinitionException(String.format("Specified name %s in @Find annotation for method stub %s!", findAnn.name(), methodName));
 		String methodDescriptor = descriptorFromExecutableElement(stub);
 		return (ExecutableElement) findMember(
 			parentFQN,

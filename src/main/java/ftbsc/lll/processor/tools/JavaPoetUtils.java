@@ -7,9 +7,9 @@ import ftbsc.lll.processor.tools.containers.ArrayContainer;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
-import ftbsc.lll.tools.DescriptorBuilder;
-import ftbsc.lll.proxies.impl.MethodProxy;
 import ftbsc.lll.proxies.impl.FieldProxy;
+import ftbsc.lll.proxies.impl.MethodProxy;
+import ftbsc.lll.tools.DescriptorBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
@@ -18,14 +18,9 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
-import java.lang.annotation.Annotation;
-import java.util.List;
-import java.util.function.Function;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
-import static ftbsc.lll.processor.tools.ASTUtils.mapModifiers;
 
 /**
  * Collection of static utils that rely on JavaPoet to function.
@@ -162,7 +157,7 @@ public class JavaPoetUtils {
 		if(isMethod) {
 			ExecutableElement executableTarget;
 			if(f.name().equals("")) //find and validate from stub
-				executableTarget = findMethodFromStub(stub, env);
+				executableTarget = findMethodFromStub(stub, null, env);
 			else { //find and validate by name alone
 				if(LilleroProcessor.badPracticeWarnings) //warn user that he is doing bad stuff
 					env.getMessager().printMessage(Diagnostic.Kind.WARNING,

@@ -202,7 +202,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
-			if(type == ProxyType.METHOD && !proxyVar.getAnnotation(Find.class).name().equals("")) {
+			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().equals("")) {
 				//methods without a specified name will be handled later
 				methodFinders.add(proxyVar);
 				continue;
@@ -412,7 +412,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			this.injector = injector;
 			this.targetStub = targetStub;
 			this.reason = injector.getAnnotation(Injector.class).reason();
-			this.target = findMethodFromStub(targetStub, processingEnv);
+			this.target = findMethodFromStub(targetStub, null, processingEnv);
 		}
 	}
 }
