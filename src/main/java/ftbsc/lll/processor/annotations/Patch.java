@@ -1,5 +1,7 @@
 package ftbsc.lll.processor.annotations;
 
+import ftbsc.lll.proxies.impl.TypeProxy;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -15,27 +17,17 @@ import java.lang.annotation.RetentionPolicy;
 @java.lang.annotation.Target(ElementType.TYPE)
 public @interface Patch {
 	/**
-	 * @return the Minecraft {@link Class} to target for patching
+	 * @return the {@link Class} to target for patching
 	 */
-	Class<?> value();
+	Class<?> value() default Object.class;
 
 	/**
-	 * @return the patching reason, for logging, defaults to "No reason specified."
-	 */
-	String reason() default "No reason specified.";
-
-	/**
- 	 * @return the name of the inner class that should be targeted,
+	 * This can be either the fully-qualified name to be used in place of {@link #value()}
+	 * or an inner class name to append after a $ symbol to the already acquired
+	 * fully-qualified name.
+	 * @return the name of the inner class that contains the target,
 	 * defaults to empty string (not an inner class)
-	 * @since 0.4.0
+	 * @since 0.5.0
 	 */
-	String innerClass() default "";
-
-	/**
-	 * @return the anonymous class counter (1 for the first, 2 for
-	 * the second, 3 for the third...) for the class that should be
-	 * targeted, defaults to 0 (not an anonymous class)
-	 * @since 0.4.0
-	 */
-	int anonymousClassCounter() default 0;
+	String className() default "";
 }

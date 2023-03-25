@@ -1,20 +1,31 @@
 package ftbsc.lll.processor.tools;
 
 import com.squareup.javapoet.*;
+import ftbsc.lll.processor.LilleroProcessor;
+import ftbsc.lll.processor.annotations.Find;
+import ftbsc.lll.processor.tools.containers.ArrayContainer;
+import ftbsc.lll.processor.tools.containers.ClassContainer;
+import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.tools.DescriptorBuilder;
-import ftbsc.lll.proxies.MethodProxy;
-import ftbsc.lll.proxies.FieldProxy;
+import ftbsc.lll.proxies.impl.MethodProxy;
+import ftbsc.lll.proxies.impl.FieldProxy;
 
+import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
+import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.function.Function;
 
-import static ftbsc.lll.processor.tools.ASTUtils.classArrayFromAnnotation;
+import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.tools.ASTUtils.mapModifiers;
 
 /**
  * Collection of static utils that rely on JavaPoet to function.
@@ -97,23 +108,6 @@ public class JavaPoetUtils {
 	}
 
 	/**
-	 * Builds a (partial, not including the return type) method descriptor from its parameters
-	 * @param ann the annotation containing the class
-	 * @param fun the annotation function returning the class
-	 * @param elementUtils the {@link Elements} containing utils for the current processing environment
-	 * @param <T> the type of the annotation carrying the information
-	 * @return the method descriptor
-	 */
-	public static <T extends Annotation> String methodDescriptorFromParams(T ann, Function<T, Class<?>[]> fun, Elements elementUtils) {
-		List<TypeMirror> mirrors = classArrayFromAnnotation(ann, fun, elementUtils);
-		StringBuilder sb = new StringBuilder("(");
-		for(TypeMirror t : mirrors)
-			sb.append(descriptorFromType(t));
-		sb.append(")");
-		return sb.toString();
-	}
-
-	/**
 	 * Adds to the given {@link MethodSpec.Builder} the given line of code,
 	 * containing a call to a method of a {@link MethodProxy.Builder} or a
 	 * {@link FieldProxy.Builder}.
@@ -138,5 +132,89 @@ public class JavaPoetUtils {
 				arr.arrayLevel
 			);
 		}
+	}
+
+	/**
+	 * Appends to a given {@link MethodSpec.Builder} definitions for a proxy.
+	 * @param fallback the {@link ClassContainer} to fall back on
+	 * @param var the {@link VariableElement} representing the proxy
+	 * @param stub the stub {@link ExecutableElement} if present or relevant, null otherwise
+	 * @param con the {@link MethodSpec.Builder} to append to
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @since 0.5.0
+	 */
+	public static void appendMemberFinderDefinition(
+		ClassContainer fallback, VariableElement var, ExecutableElement stub, MethodSpec.Builder con, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		ProxyType type = getProxyType(var);
+		if(type != ProxyType.METHOD && type != ProxyType.FIELD)
+			return; //this method is irrelevant to everyoen else
+
+		//we need this stuff
+		Find f = var.getAnnotation(Find.class);
+		ClassContainer parent = findClassOrFallback(fallback, f, env, mapper);
+		final boolean isMethod = type == ProxyType.METHOD;
+		final String builderName = var.getSimpleName().toString() + "Builder";
+
+		String name, nameObf;
+		Element target;
+
+		if(isMethod) {
+			ExecutableElement executableTarget;
+			if(f.name().equals("")) //find and validate from stub
+				executableTarget = findMethodFromStub(stub, env);
+			else { //find and validate by name alone
+				if(LilleroProcessor.badPracticeWarnings) //warn user that he is doing bad stuff
+					env.getMessager().printMessage(Diagnostic.Kind.WARNING,
+						String.format("Matching method %s by name, this is bad practice and may lead to unexpected behaviour. Use @Target stubs instead!", f.name()));
+				executableTarget = (ExecutableElement) findMember(parent.fqn, f.name(), null, false, false, env);
+			}
+			name = executableTarget.getSimpleName().toString();
+			nameObf = findMemberName(parent.fqnObf, name, descriptorFromExecutableElement(executableTarget), mapper);
+			target = executableTarget;
+		} else {
+			//find and validate target
+			name = f.name().equals("") ? var.getSimpleName().toString() : f.name();
+			target = findMember(parent.fqn, name, null, false, true, env);
+			nameObf = findMemberName(parent.fqnObf, name, null, mapper);
+		}
+
+		//initialize builder
+		con.addStatement("$T $L = $T.builder($S)",
+			isMethod ? MethodProxy.Builder.class : FieldProxy.Builder.class,
+			builderName, //variable name is always unique by definition
+			isMethod ? MethodProxy.class : FieldProxy.class,
+			nameObf
+		);
+
+		//set parent
+		con.addStatement(
+			"$L.setParent($S, $L)",
+			builderName,
+			parent.fqnObf,
+			mapModifiers(parent.elem.getModifiers())
+		);
+
+		//set modifiers
+		con.addStatement(
+			"$L.setModifiers($L)",
+			builderName,
+			mapModifiers(target.getModifiers())
+		);
+
+		if(isMethod) { //set parameters and return type
+			ExecutableElement executableTarget = (ExecutableElement) target;
+			for(VariableElement p : executableTarget.getParameters())
+				addTypeToProxyGenerator(con,	builderName, "addParameter", p.asType());
+			addTypeToProxyGenerator(con, builderName, "setReturnType", executableTarget.getReturnType());
+		} else //set type
+			addTypeToProxyGenerator(con,builderName, "setType", target.asType());
+
+		//build and set
+		con.addStatement(
+			"super.$L = $L.build()",
+			var.getSimpleName().toString(),
+			builderName
+		);
 	}
 }

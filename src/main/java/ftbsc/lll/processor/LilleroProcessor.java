@@ -8,9 +8,12 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
+import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
-import ftbsc.lll.proxies.FieldProxy;
-import ftbsc.lll.proxies.MethodProxy;
+import ftbsc.lll.proxies.ProxyType;
+import ftbsc.lll.proxies.impl.FieldProxy;
+import ftbsc.lll.proxies.impl.MethodProxy;
+import ftbsc.lll.proxies.impl.TypeProxy;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -37,7 +40,7 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@SupportedOptions("mappingsFile")
+@SupportedOptions({"mappingsFile", "badPracticeWarnings"})
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -50,6 +53,12 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
 	private ObfuscationMapper mapper;
+
+	/**
+	 * Whether the processor should issue warnings when compiling code adopting
+	 * bad practices.
+	 */
+	public static boolean badPracticeWarnings = true;
 
 	/**
 	 * Initializes the processor with the processing environment by
@@ -87,6 +96,17 @@ public class LilleroProcessor extends AbstractProcessor {
 			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
 				StandardCharsets.UTF_8)).lines());
 		}
+		String warns = processingEnv.getOptions().get("badPracticeWarnings");
+		if(warns == null)
+			badPracticeWarnings = true;
+		else {
+			try { // 0 = false, any other integer = true
+				int i = Integer.parseInt(warns);
+				badPracticeWarnings = i != 0;
+			} catch(NumberFormatException ignored) {
+				badPracticeWarnings = Boolean.parseBoolean(warns);
+			}
+		}
 	}
 
 	/**
@@ -110,7 +130,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						.filter(this::isValidInjector)
 						.collect(Collectors.toSet());
 				if(!validInjectors.isEmpty()) {
-					validInjectors.forEach(this::generateInjectors);
+					validInjectors.forEach(this::generateClasses);
 					if (!this.generatedInjectors.isEmpty()) {
 						generateServiceProvider();
 						return true;
@@ -141,7 +161,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				&& processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
 		})) return true;
 		else {
-			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, //TODO orphan targets
 				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
@@ -152,17 +172,16 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Basically implements the {@link IInjector} interface for you.
 	 * @param cl the {@link TypeElement} for the given class
 	 */
-	private void generateInjectors(TypeElement cl) {
+	private void generateClasses(TypeElement cl) {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
-		String targetClassFQN =
-			findClassName(
-				getClassFullyQualifiedName(
-					patchAnn,
-					Patch::value,
-					getInnerName(patchAnn, Patch::innerClass, Patch::anonymousClassCounter)
-				), this.mapper
-			).replace('/', '.');
+		ClassContainer targetClass = new ClassContainer(
+			getClassFullyQualifiedName(
+				patchAnn,
+				Patch::value,
+				patchAnn.className()
+			), this.processingEnv, this.mapper
+		);
 
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -170,91 +189,118 @@ public class LilleroProcessor extends AbstractProcessor {
 			packageElement = packageElement.getEnclosingElement();
 		String packageName = packageElement.toString();
 
-		//find injector(s) and target(s)
-		List<ExecutableElement> injectors = findAnnotatedMethods(cl, Injector.class);
+		//find annotated elements
+		List<ExecutableElement> targets = findAnnotatedElement(cl, Target.class);
+		List<ExecutableElement> injectors = findAnnotatedElement(cl, Injector.class);
+		List<VariableElement> finders = findAnnotatedElement(cl, Find.class);
 
-		List<ExecutableElement> targets = findAnnotatedMethods(cl, Target.class);
+		//initialize the constructor builder
+		MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder();
+
+		//take care of TypeProxies and FieldProxies first
+		for(VariableElement proxyVar : finders) {
+			ProxyType type = getProxyType(proxyVar);
+			if(type == ProxyType.METHOD) //methods will be handled later
+				continue;
+			//case-specific handling
+			if(type == ProxyType.TYPE) {
+				//find and validate
+				ClassContainer clazz = findClassOrFallback(targetClass, proxyVar.getAnnotation(Find.class), this.processingEnv, this.mapper);
+				//types can be generated with a single instruction
+				constructorBuilder.addStatement(
+					"super.$L = $T.from($S, 0, $L)",
+					proxyVar.getSimpleName().toString(),
+					TypeProxy.class,
+					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
+					mapModifiers(clazz.elem.getModifiers())
+				);
+			} else if(type == ProxyType.FIELD)
+				appendMemberFinderDefinition(targetClass, proxyVar, null, constructorBuilder, this.processingEnv, this.mapper);
+			finders.remove(proxyVar); //remove finders that have already been processed
+		}
 
 		//declare it once for efficiency
-		List<String> targetNames =
-			targets.stream()
+		List<String> injectorNames =
+			injectors.stream()
 				.map(ExecutableElement::getSimpleName)
 				.map(Object::toString)
 				.collect(Collectors.toList());
 
 		//this will contain the classes to generate: the key is the class name
-		Map<String, InjectorInfo> toGenerate = new HashMap<>();
+		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
 
-		for(ExecutableElement inj : injectors) {
-			Injector[] minjAnn = inj.getAnnotationsByType(Injector.class);
+		for(ExecutableElement tg : targets) {
+			Target[] mtgAnn = tg.getAnnotationsByType(Target.class);
 			int iterationNumber = 1;
-			for(Injector injectorAnn : minjAnn) { //java is dumb
-				List<ExecutableElement> injectionCandidates = targets;
+			for(Target targetAnn : mtgAnn) {
+				List<ExecutableElement> injectorCandidates = injectors;
+				List<VariableElement> finderCandidates = finders;
 
-				if(!injectorAnn.targetName().equals("") && targetNames.contains(injectorAnn.targetName())) {
-					//case 1: it has a name, try to match it
-					injectionCandidates =
-						injectionCandidates
+				if(!targetAnn.of().equals("") && injectorNames.contains(targetAnn.of())) {
+					//case 1: find target by name
+					injectorCandidates =
+						injectorCandidates
 							.stream()
-							.filter(i -> i.getSimpleName().contentEquals(injectorAnn.targetName()))
+							.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
 							.collect(Collectors.toList());
-				} else if(targets.size() == 1) {
-					//case 2: there is only one target
-					injectionCandidates = new ArrayList<>();
-					injectionCandidates.add(targets.get(0));
+					finderCandidates =
+						finderCandidates
+							.stream()
+							.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
+							.collect(Collectors.toList());
+				} else if(injectors.size() == 1) {
+					//case 2: there is only one injector
+					finderCandidates = new ArrayList<>(); //no candidates
+					injectorCandidates = new ArrayList<>();
+					injectorCandidates.add(targets.get(0));
 				} else {
 					//case 3: try to match by injectTargetName
-					String inferredName = inj.getSimpleName()
-						.toString()
-						.replaceFirst("inject", "");
-					injectionCandidates =
-						injectionCandidates
+					finderCandidates = new ArrayList<>(); //no candidates
+					String inferredName = "inject" + tg.getSimpleName();
+					injectorCandidates =
+						injectorCandidates
 							.stream()
 							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
 							.collect(Collectors.toList());
 				}
 
-				ExecutableElement injectionTarget = null;
-
-				if(injectionCandidates.size() == 1)
-					injectionTarget = injectionCandidates.get(0);
+				//throw exception if user is a moron and defined a finder and an injector with the same name
+				if(finderCandidates.size() != 0 && injectorCandidates.size() != 0)
+					throw new AmbiguousDefinitionException(
+						String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
+					);
+				else if(finderCandidates.size() == 0 && injectorCandidates.size() != 1)
+					throw new AmbiguousDefinitionException(
+						String.format("Found multiple candidate injectors for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
+					);
+				else if(injectorCandidates.size() == 0 && finderCandidates.size() != 1)
+					throw new AmbiguousDefinitionException(
+						String.format("Found multiple candidate finders for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
+					);
 				else {
-					List<TypeMirror> params = classArrayFromAnnotation(injectorAnn, Injector::params, processingEnv.getElementUtils());
-
-					if(params.size() != 0) {
-						StringBuilder descr = new StringBuilder("(");
-						for(TypeMirror p : params)
-							descr.append(descriptorFromType(TypeName.get(p)));
-						descr.append(")");
-						injectionCandidates =
-							injectionCandidates
-								.stream()
-								.filter(t -> //we care about arguments but not really about return type
-									descr.toString()
-										.split("\\)")[0]
-										.equalsIgnoreCase(descriptorFromExecutableElement(t).split("\\)")[0])
-								).collect(Collectors.toList());
+					if(injectorCandidates.size() == 1) {
+						//matched an injector!
+						toGenerate.put(
+							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
+							new InjectorInfo(injectorCandidates.get(0), tg)
+						);
+						iterationNumber++; //increment is only used by injectors
+					} else {
+						//matched a finder!
+						VariableElement finder = finders.get(0);
+						Find f = finder.getAnnotation(Find.class);
+						appendMemberFinderDefinition(targetClass, finder, tg, constructorBuilder, this.processingEnv, this.mapper);
+						finders.remove(finder); //unlike injectors, finders can't apply to multiple targets
 					}
-
-					if(injectionCandidates.size() == 1)
-						injectionTarget = injectionCandidates.get(0);
 				}
 
-				//if we haven't found it yet, it's an ambiguity
-				if(injectionTarget == null)
-					throw new AmbiguousDefinitionException(String.format("Unclear target for injector %s::%s!", cl.getSimpleName(), inj.getSimpleName()));
-				else toGenerate.put(
-						String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-						new InjectorInfo(inj, injectionTarget)
-					);
-				iterationNumber++;
 			}
 		}
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
 			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
-			String targetMethodName = findMemberName(targetClassFQN, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
+			String targetMethodName = findMemberName(targetClass.fqnObf, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
 
 			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).targetStub)
 				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
@@ -279,12 +325,12 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addModifiers(Modifier.PUBLIC)
 				.superclass(cl.asType())
 				.addSuperinterface(ClassName.get(IInjector.class))
+				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
-				.addMethod(buildStringReturnMethod("reason", patchAnn.reason()))
-				.addMethod(buildStringReturnMethod("targetClass", targetClassFQN))
+				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
+				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqn))
 				.addMethod(buildStringReturnMethod("methodName", targetMethodName))
 				.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
-				.addMethods(generateRequestedProxies(cl, this.mapper))
 				.addMethod(stubOverride)
 				.addMethod(inject)
 				.build();
@@ -303,53 +349,6 @@ public class LilleroProcessor extends AbstractProcessor {
 
 			this.generatedInjectors.add(injectorClassName);
 		}
-	}
-
-	/**
-	 * Finds any method annotated with {@link Find} within the given class, generates
-	 * the {@link MethodSpec} necessary for building it.
-	 * @param cl the class to search
-	 * @return a {@link List} of method specs
-	 * @since 0.2.0
-	 */
-	private List<MethodSpec> generateRequestedProxies(TypeElement cl, ObfuscationMapper mapper) {
-		List<MethodSpec> generated = new ArrayList<>();
-		findAnnotatedMethods(cl, Find.class)
-			.stream()
-			.filter(m -> !m.getModifiers().contains(Modifier.STATIC)) //skip static stuff as we can't override it
-			.filter(m -> !m.getModifiers().contains(Modifier.FINAL)) //in case someone is trying to be funny
-			.forEach(m -> {
-				boolean isMethod = isMethodProxyStub(m);
-				Element target = findMemberFromStub(m, processingEnv);
-
-				MethodSpec.Builder b = MethodSpec.overriding(m);
-
-				String targetParentFQN = findClassName(((TypeElement) target.getEnclosingElement()).getQualifiedName().toString(), mapper);
-				String methodDescriptor = isMethod ? descriptorFromExecutableElement((ExecutableElement) target) : null;
-
-				b.addStatement("$T bd = $T.builder($S)",
-					isMethod ? MethodProxy.Builder.class : FieldProxy.Builder.class,
-					isMethod ? MethodProxy.class : FieldProxy.class,
-					findMemberName(targetParentFQN, target.getSimpleName().toString(), methodDescriptor, mapper)
-				);
-
-				b.addStatement("bd.setParent($S)", targetParentFQN);
-
-				for(Modifier mod : target.getModifiers())
-					b.addStatement("bd.addModifier($L)", mapModifier(mod));
-
-				if(isMethod) {
-					ExecutableElement targetMethod = (ExecutableElement) target;
-					for(VariableElement p : targetMethod.getParameters())
-						addTypeToProxyGenerator(b, "bd", "addParameter", p.asType());
-					addTypeToProxyGenerator(b, "bd", "setReturnType", targetMethod.getReturnType());
-				} else addTypeToProxyGenerator(b, "bd", "setType", target.asType());
-
-				b.addStatement("return bd.build()");
-
-				generated.add(b.build());
-			});
-		return generated;
 	}
 
 	/**
@@ -385,6 +384,11 @@ public class LilleroProcessor extends AbstractProcessor {
 		public final ExecutableElement targetStub;
 
 		/**
+		 * The reason for the injection.
+		 */
+		public final String reason;
+
+		/**
 		 * The {@link ExecutableElement} corresponding to the target method.
 		 */
 		private final ExecutableElement target;
@@ -397,7 +401,8 @@ public class LilleroProcessor extends AbstractProcessor {
 		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub) {
 			this.injector = injector;
 			this.targetStub = targetStub;
-			this.target = (ExecutableElement) findMemberFromStub(targetStub, processingEnv);
+			this.reason = injector.getAnnotation(Injector.class).reason();
+			this.target = findMethodFromStub(targetStub, processingEnv);
 		}
 	}
 }

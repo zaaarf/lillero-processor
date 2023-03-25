@@ -1,8 +1,8 @@
 package ftbsc.lll.exceptions;
 
 import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.proxies.FieldProxy;
-import ftbsc.lll.proxies.MethodProxy;
+import ftbsc.lll.proxies.impl.FieldProxy;
+import ftbsc.lll.proxies.impl.MethodProxy;
 
 /**
  * Thrown when a method is annotated with {@link Find} but does not
@@ -16,6 +16,6 @@ public class NotAProxyException extends RuntimeException {
 	 * @param method the name of the method wrongly annotated
 	 */
 	public NotAProxyException(String parent, String method) {
-		super(String.format("Annotated method %s::%s does not return a proxy!", parent, method));
+		super(String.format("Annotated field %s::%s does not return a proxy!", parent, method));
 	}
 }

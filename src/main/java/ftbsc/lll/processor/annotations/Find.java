@@ -1,7 +1,8 @@
 package ftbsc.lll.processor.annotations;
 
-import ftbsc.lll.proxies.FieldProxy;
-import ftbsc.lll.proxies.MethodProxy;
+import ftbsc.lll.proxies.impl.FieldProxy;
+import ftbsc.lll.proxies.impl.MethodProxy;
+import ftbsc.lll.proxies.impl.TypeProxy;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -14,43 +15,39 @@ import java.lang.annotation.RetentionPolicy;
  * @since 0.4.0
  */
 @Retention(RetentionPolicy.CLASS)
-@java.lang.annotation.Target(ElementType.METHOD)
+@java.lang.annotation.Target(ElementType.FIELD)
 public @interface Find {
 	/**
 	 * @return the {@link Class} object containing the target, or the
 	 * {@link Object} class if not specified (the {@link Class} from
-	 * {@link Patch#value()} is instead used)
+	 * {@link Patch#value()} is instead used).
+	 * @since 0.5.0
 	 */
-	Class<?> parent() default Object.class;
+	Class<?> value() default Object.class;
 
 	/**
+	 * For a {@link TypeProxy}, this can be either the fully-qualified name
+	 * to be used in place of {@link #value()} or an inner class name to append
+	 * after a $ symbol to the already acquired fully-qualified name.
+	 * For others, this is refers to the parent class.
 	 * @return the name of the inner class that contains the target,
 	 * defaults to empty string (not an inner class)
-	 * @since 0.4.0
+	 * @since 0.5.0
 	 */
-	String parentInnerClass() default "";
+	String className() default "";
 
 	/**
-	 * @return the anonymous class counter (1 for the first, 2 for
-	 * the second, 3 for the third...) for the class that contains
-	 * the target, defaults to 0 (not an anonymous class)
-	 * @since 0.4.0
-	 */
-	int parentAnonymousClassCounter() default 0;
-
-	/**
-	 * The name of the class member to find. If omitted, the name of the
-	 * annotated method will be used.
+	 * For a {@link FieldProxy}, this is the name of the field to find. If omitted,
+	 * it will fall back on the name of the annotated field.
+	 * For a {@link MethodProxy} it indicates an attempt to match by name only, with
+	 * this name. This will issue a warning unless warnings are disabled. It will fail
+	 * and throw an exception if multiple methods with that name are found in the
+	 * relevant class. It is generally recommended that you use a @link Target} stub
+	 * for methods, as this can lead to unpredictable behaviour at runtime.
+	 * It will have no effect on a {@link TypeProxy}.
 	 * @return the name of the target, will default to the empty string
-	 * (the name of the annotated method will instead be used)
+	 * (the name of the annotated method will instead be used).
+	 * @since 0.5.0
 	 */
 	String name() default "";
-
-	/**
-	 * Only use if the target is a method.
-	 * @return a list of the parameters of the method, will default to empty
-	 * array (in that case, an attempt will be made to match a method without
-	 * args first)
-	 */
-	Class<?>[] params() default {};
 }

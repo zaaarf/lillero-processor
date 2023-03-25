@@ -1,6 +1,5 @@
 package ftbsc.lll.processor.tools;
 
-import com.squareup.javapoet.*;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 import ftbsc.lll.exceptions.NotAProxyException;
@@ -8,9 +7,9 @@ import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
+import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
-import ftbsc.lll.proxies.FieldProxy;
-import ftbsc.lll.proxies.MethodProxy;
+import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
@@ -19,12 +18,12 @@ import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.methodDescriptorFromParams;
 
 /**
  * Collection of AST-related static utils that didn't really fit into the main class.
@@ -32,17 +31,19 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.methodDescriptorFromParams
 public class ASTUtils {
 	/**
 	 * Finds, among the methods of a class cl, the one annotated with ann, and tries to build
-	 * a {@link ExecutableElement} from it.
-	 * @param cl the {@link ExecutableElement} for the class containing the desired method
+	 * an {@link Element} from it.
+	 * @param parent the parent {@link Element} to the desired element
 	 * @param ann the {@link Class} corresponding to the desired annotation
-	 * @return a {@link List} of {@link MethodSpec}s annotated with the given annotation
+	 * @param <T> the type of {@link Element} to use
+	 * @return a {@link List} of {@link Element}s annotated with the given annotation
 	 * @since 0.2.0
 	 */
-	public static List<ExecutableElement> findAnnotatedMethods(TypeElement cl, Class<? extends Annotation> ann) {
-		return cl.getEnclosedElements()
+	@SuppressWarnings("unchecked")
+	public static <T extends Element>  List<T> findAnnotatedElement(Element parent, Class<? extends Annotation> ann) {
+		return parent.getEnclosedElements()
 			.stream()
 			.filter(e -> e.getAnnotationsByType(ann).length != 0)
-			.map(e -> (ExecutableElement) e)
+			.map(e -> (T) e)
 			.collect(Collectors.toList());
 	}
 
@@ -84,45 +85,40 @@ public class ASTUtils {
 	}
 
 	/**
+	 * Takes in a {@link Collection} of AST {@link Modifier}s and
+	 * returns them mapped to their reflective integer equivalent.
+	 * @param modifiers the {@link Modifier}s
+	 * @return an integer value representing them
+	 * @since 0.5.0
+	 */
+	public static int mapModifiers(Collection<Modifier> modifiers) {
+		int i = 0;
+		for(Modifier m : modifiers)
+			i |= mapModifier(m);
+		return i;
+	}
+
+	/**
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param parentFunction the annotation function returning the class
-	 * @param innerName a string containing the inner class name or anonymous class number, may be null
+	 * @param name a string containing the FQN, the inner class name or nothing
 	 * @param <T> the type of the annotation carrying the information
 	 * @return the fully qualified name of the given class
 	 * @since 0.3.0
 	 */
-	public static <T extends Annotation> String getClassFullyQualifiedName(T ann, Function<T, Class<?>> parentFunction, String innerName) {
+	public static <T extends Annotation> String getClassFullyQualifiedName(T ann, Function<T, Class<?>> parentFunction, String name) {
+		if(name.contains("."))
+			return name;
 		String fqn;
 		try {
 			fqn = parentFunction.apply(ann).getCanonicalName();
 		} catch(MirroredTypeException e) {
 			fqn = e.getTypeMirror().toString();
 		}
-		if(innerName != null)
-			fqn = String.format("%s$%s", fqn, innerName);
+		if(!name.equals(""))
+			fqn = String.format("%s$%s", fqn, name);
 		return fqn;
-	}
-
-	/**
-	 * Extracts the inner class name as a String from the annotation.
-	 * @param ann the annotation containing the class
-	 * @param innerClassFunction the annotation function returning the inner class name
-	 * @param anonymousCounterFunction the annotation function returning the anonymous class counter
-	 * @param <T> the type of the annotation carrying the information
-	 * @return the name of the inner class, or null if the target isn't an inner class
-	 * @since 0.4.0
-	 */
-	public static <T extends Annotation> String getInnerName(T ann, Function<T, String> innerClassFunction, Function<T, Integer> anonymousCounterFunction) {
-		String inner = null;
-		if(!innerClassFunction.apply(ann).equals(""))
-			inner =  innerClassFunction.apply(ann);
-		if(anonymousCounterFunction.apply(ann) != 0) {
-			if(inner != null)
-				throw new AmbiguousDefinitionException(String.format("Unclear inner class, is it %s or %d?", inner, anonymousCounterFunction.apply(ann)));
-			else inner = anonymousCounterFunction.apply(ann).toString();
-		}
-		return inner;
 	}
 
 	/**
@@ -165,30 +161,40 @@ public class ASTUtils {
 
 	/**
 	 * Finds the class name and maps it to the correct format.
-	 * @param patchAnn  the {@link Patch} annotation containing target class info
+	 * @param fallback  the (unobfuscated) FQN to fall back on
 	 * @param finderAnn an annotation containing metadata about the target, may be null
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
-	private static String findClassName(Patch patchAnn, Find finderAnn) {
+	public static String findClassNameFromAnnotations(String fallback, Find finderAnn) {
 		String fullyQualifiedName;
 		if(finderAnn != null) {
 			fullyQualifiedName =
 				getClassFullyQualifiedName(
 					finderAnn,
-					Find::parent,
-					getInnerName(finderAnn, Find::parentInnerClass, Find::parentAnonymousClassCounter)
+					Find::value,
+					finderAnn.className()
 				);
 			if(!fullyQualifiedName.equals("java.lang.Object"))
 				return findClassName(fullyQualifiedName, null);
 		}
-		fullyQualifiedName =
+		return findClassName(fallback, null);
+	}
+
+	/**
+	 * Finds the class name and maps it to the correct format.
+	 * @param patchAnn  the {@link Patch} annotation containing target class info
+	 * @param finderAnn an annotation containing metadata about the target, may be null
+	 * @return the fully qualified class name
+	 * @since 0.3.0
+	 */
+	public static String findClassNameFromAnnotations(Patch patchAnn, Find finderAnn) {
+		return findClassNameFromAnnotations(
 			getClassFullyQualifiedName(
 				patchAnn,
 				Patch::value,
-				getInnerName(patchAnn, Patch::innerClass, Patch::anonymousClassCounter)
-			);
-		return findClassName(fullyQualifiedName, null);
+				patchAnn.className()
+			), null);
 	}
 
 	/**
@@ -222,10 +228,10 @@ public class ASTUtils {
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	private static Element findMember(String parentFQN, String name, String descr, boolean strict, boolean field, ProcessingEnvironment env) {
+	public static Element findMember(String parentFQN, String name, String descr, boolean strict, boolean field, ProcessingEnvironment env) {
 		TypeElement parent = env.getElementUtils().getTypeElement(parentFQN);
 		if(parent == null)
-			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s!", parentFQN));
+			throw new AmbiguousDefinitionException(String.format("Could not find parent class %s for member %s!", parentFQN, descr == null ? name : name + descr));
 		//try to find by name
 		List<Element> candidates = parent.getEnclosedElements()
 			.stream()
@@ -233,12 +239,12 @@ public class ASTUtils {
 			.filter(e -> e.getSimpleName().contentEquals(name))
 			.collect(Collectors.toList());
 		if(candidates.size() == 0)
-			throw new TargetNotFoundException(String.format("%s %s", name, descr));
+			throw new TargetNotFoundException(field ? "field" : "method", String.format("%s %s", name, descr));
 		if(candidates.size() == 1 && (!strict || field))
 			return candidates.get(0);
-		if(descr == null) {
+		if(field || descr == null) {
 			throw new AmbiguousDefinitionException(
-				String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
+				String.format("Found %d members named %s in class %s!", candidates.size(), name, parentFQN)
 			);
 		} else {
 			candidates = candidates.stream()
@@ -248,7 +254,7 @@ public class ASTUtils {
 					: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
 				).collect(Collectors.toList());
 			if(candidates.size() == 0)
-				throw new TargetNotFoundException(String.format("%s %s", name, descr));
+				throw new TargetNotFoundException("method", String.format("%s %s", name, descr));
 			if(candidates.size() > 1)
 				throw new AmbiguousDefinitionException(
 					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parentFQN)
@@ -258,54 +264,73 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Finds the real class member (field or method) corresponding to a stub annotated with
-	 * {@link Target} or {@link Find}.
+	 * Finds the real class method corresponding to a stub annotated with {@link Target}.
 	 * @param stub the {@link ExecutableElement} for the stub
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @return the {@link Element} corresponding to the method or field
+	 * @return the {@link ExecutableElement} corresponding to the method
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static Element findMemberFromStub(ExecutableElement stub, ProcessingEnvironment env) {
+	public static ExecutableElement findMethodFromStub(ExecutableElement stub, ProcessingEnvironment env) {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		//there should ever only be one of these two
 		Target targetAnn = stub.getAnnotation(Target.class); //if this is null strict mode is always disabled
 		Find findAnn = stub.getAnnotation(Find.class); //this may be null, it means no fallback info
-		String parentFQN = findClassName(patchAnn, findAnn);
-		String methodDescriptor =
-			findAnn != null
-				? methodDescriptorFromParams(findAnn, Find::params, env.getElementUtils())
-				: descriptorFromExecutableElement(stub);
-		String memberName =
-			findAnn != null && !findAnn.name().equals("")
-				? findAnn.name()
-				: stub.getSimpleName().toString();
-		return findMember(
+		String parentFQN = findClassNameFromAnnotations(patchAnn, findAnn);
+		String methodName = stub.getSimpleName().toString();
+		if(findAnn != null && !findAnn.name().equals(""))
+			throw new AmbiguousDefinitionException(String.format("Specified name %s in @Find annotation for method stub %s!", findAnn.name(), methodName));
+		String methodDescriptor = descriptorFromExecutableElement(stub);
+		return (ExecutableElement) findMember(
 			parentFQN,
-			memberName,
+			methodName,
 			methodDescriptor,
 			targetAnn != null && targetAnn.strict(),
-			targetAnn == null && !isMethodProxyStub(stub), //only evaluate if target is null
+			false, //only evaluate if target is null
 			env
 		);
 	}
 
 	/**
-	 * Utility method for finding out what type of proxy a method is.
+	 * Utility method for finding out what type of proxy a field is.
 	 * It will fail if the return type is not a known type of proxy.
-	 * @param m the annotated {@link ExecutableElement}
-	 * @return whether it returns a {@link MethodProxy} or a {@link FieldProxy}
+	 * @param v the annotated {@link VariableElement}
+	 * @return the {@link ProxyType} for the element
 	 * @throws NotAProxyException if it's neither
 	 * @since 0.4.0
 	 */
-	public static boolean isMethodProxyStub(ExecutableElement m) {
-		String returnTypeFQN = m.getReturnType().toString();
-		if(returnTypeFQN.equals("ftbsc.lll.proxies.FieldProxy"))
-			return false;
-		else if(returnTypeFQN.equals("ftbsc.lll.proxies.MethodProxy"))
-			return true;
-		else throw new NotAProxyException(m.getEnclosingElement().getSimpleName().toString(), m.getSimpleName().toString());
+	public static ProxyType getProxyType(VariableElement v) {
+		String returnTypeFQN = v.asType().toString();
+		switch(returnTypeFQN) {
+			case "ftbsc.lll.proxies.impl.FieldProxy":
+				return ProxyType.FIELD;
+			case "ftbsc.lll.proxies.impl.MethodProxy":
+				return ProxyType.METHOD;
+			case "ftbsc.lll.proxies.impl.TypeProxy":
+				return ProxyType.TYPE;
+			case "ftbsc.lll.proxies.impl.PackageProxy":
+				return ProxyType.PACKAGE;
+			default:
+				throw new NotAProxyException(v.getEnclosingElement().getSimpleName().toString(), v.getSimpleName().toString());
+		}
+	}
+
+	/**
+	 * Finds and builds a {@link ClassContainer} based on information contained
+	 * within a {@link Find} annotation, else returns a fallback.
+	 * @param fallback the {@link ClassContainer} it falls back on
+	 * @param f the {@link Find} annotation to get info from
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @return the built {@link ClassContainer} or the fallback if not enough information was present
+	 * @since 0.5.0
+	 */
+	public static ClassContainer findClassOrFallback(ClassContainer fallback, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		String fqn = getClassFullyQualifiedName(f, Find::value, f.className());
+		return fqn.equals("java.lang.Object")
+			? fallback
+			: new ClassContainer(fqn, env, mapper);
 	}
 }

@@ -6,14 +6,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Used to support {@link Injector} as a {@link Repeatable} annotation.
- * @since 0.3.0
+ * Used to support {@link Target} as a {@link Repeatable} annotation.
+ * @since 0.5.0
  */
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
-public @interface MultipleInjectors {
+public @interface MultipleTargets {
 	/**
 	 * @return the {@link Injector} annotations, as an array
 	 */
-	Injector[] value();
+	Target[] value();
 }
