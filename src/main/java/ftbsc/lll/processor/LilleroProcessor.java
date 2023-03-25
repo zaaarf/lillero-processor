@@ -248,18 +248,17 @@ public class LilleroProcessor extends AbstractProcessor {
 							.stream()
 							.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
 							.collect(Collectors.toList());
-				} else if(injectors.size() == 1) {
-					//case 2: there is only one injector
+				} else if(injectors.size() == 1 && targets.size() == 1) {
+					//case 2: there is only one target, must use it for that injector
 					finderCandidates = new ArrayList<>(); //no candidates
 					injectorCandidates = new ArrayList<>();
 					injectorCandidates.add(injectors.get(0));
 				} else {
-					//case 3: try to match by injectTargetName or same name for finers
-					String inferredName = "inject" + tg.getSimpleName();
+					//case 3: try to match by injectTargetName or same name for finders
 					injectorCandidates =
 						injectorCandidates
 							.stream()
-							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
+							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase("inject" + tg.getSimpleName()))
 							.collect(Collectors.toList());
 					finderCandidates =
 						finderCandidates
