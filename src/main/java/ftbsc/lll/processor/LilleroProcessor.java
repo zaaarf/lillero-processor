@@ -11,8 +11,6 @@ import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
-import ftbsc.lll.proxies.impl.FieldProxy;
-import ftbsc.lll.proxies.impl.MethodProxy;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
 import javax.annotation.processing.*;
@@ -223,9 +221,6 @@ public class LilleroProcessor extends AbstractProcessor {
 				appendMemberFinderDefinition(targetClass, proxyVar, null, constructorBuilder, this.processingEnv, this.mapper);
 		}
 
-		//targets that have matched at least once are put in here
-		Set<ExecutableElement> matchedTargets = new HashSet<>();
-
 		//this will contain the classes to generate: the key is the class name
 		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
 
@@ -270,9 +265,8 @@ public class LilleroProcessor extends AbstractProcessor {
 						String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
 					);
 				else if(finderCandidates.size() == 0 && injectorCandidates.size() == 0)
-					throw new AmbiguousDefinitionException(
-						String.format("Could not find any candidate mathcing target %s", tg.getSimpleName().toString())
-					);
+					processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+						String.format("Found orphan @Target annotation on method %s, it will be ignored!", tg.getSimpleName().toString()));
 				else if(finderCandidates.size() == 0 && injectorCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate injectors for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
@@ -282,7 +276,6 @@ public class LilleroProcessor extends AbstractProcessor {
 						String.format("Found multiple candidate finders for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
 					);
 				else {
-					matchedTargets.add(tg);
 					if(injectorCandidates.size() == 1) {
 						//matched an injector!
 						toGenerate.put(
@@ -304,10 +297,6 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-
-		//find orphan targets and warn
-		Set<ExecutableElement> orphanTargets = targets.stream().filter(t -> !matchedTargets.contains(t)).collect(Collectors.toSet());
-		//TODO!
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
