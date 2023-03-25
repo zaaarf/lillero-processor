@@ -4,6 +4,7 @@ import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.InvalidResourceException;
+import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
@@ -159,7 +160,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				&& processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
 		})) return true;
 		else {
-			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, //TODO orphan targets
+			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
@@ -224,6 +225,10 @@ public class LilleroProcessor extends AbstractProcessor {
 		//this will contain the classes to generate: the key is the class name
 		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
 
+		//these are needed for orphan checks
+		HashSet<ExecutableElement> matchedInjectors = new HashSet<>();
+		HashSet<VariableElement> matchedMethodFinders = new HashSet<>();
+
 		for(ExecutableElement tg : targets) {
 			Target[] mtgAnn = tg.getAnnotationsByType(Target.class);
 			int iterationNumber = 1;
@@ -248,14 +253,18 @@ public class LilleroProcessor extends AbstractProcessor {
 					finderCandidates = new ArrayList<>(); //no candidates
 					injectorCandidates = new ArrayList<>();
 					injectorCandidates.add(injectors.get(0));
-				} else {  //todo match finders based on same name
-					//case 3: try to match by injectTargetName
-					finderCandidates = new ArrayList<>(); //no candidates
+				} else {
+					//case 3: try to match by injectTargetName or same name for finers
 					String inferredName = "inject" + tg.getSimpleName();
 					injectorCandidates =
 						injectorCandidates
 							.stream()
 							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase(inferredName))
+							.collect(Collectors.toList());
+					finderCandidates =
+						finderCandidates
+							.stream()
+							.filter(t -> t.getSimpleName().contentEquals(tg.getSimpleName()))
 							.collect(Collectors.toList());
 				}
 
@@ -278,16 +287,20 @@ public class LilleroProcessor extends AbstractProcessor {
 				else {
 					if(injectorCandidates.size() == 1) {
 						//matched an injector!
+						ExecutableElement injector = injectorCandidates.get(0);
+						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injectorCandidates.get(0), tg)
+							new InjectorInfo(injector, tg)
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
 						//matched a finder!
+						VariableElement finder = finderCandidates.get(0);
+						matchedMethodFinders.add(finder);
 						appendMemberFinderDefinition(
 							targetClass,
-							finderCandidates.get(0),
+							finder,
 							tg,
 							constructorBuilder,
 							this.processingEnv,
@@ -297,6 +310,14 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
+
+		//find orphans, throw exception if any are found
+		for(ExecutableElement e : injectors)
+			if(!matchedInjectors.contains(e))
+				throw new OrphanElementException(e);
+		for(VariableElement e : methodFinders)
+			if(!matchedMethodFinders.contains(e))
+				throw new OrphanElementException(e);
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {

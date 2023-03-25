@@ -1,7 +1,5 @@
 package ftbsc.lll.processor.annotations;
 
-import ftbsc.lll.proxies.impl.TypeProxy;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
