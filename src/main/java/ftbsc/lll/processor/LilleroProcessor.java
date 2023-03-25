@@ -152,7 +152,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		TypeMirror classNodeType = processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
 		TypeMirror methodNodeType = processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
 		if (elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
-			&& elem.getEnclosedElements().stream().anyMatch(e -> {
+			&& elem.getEnclosedElements().stream().filter(e -> e instanceof ExecutableElement).anyMatch(e -> {
 			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
 			return e.getAnnotation(Injector.class) != null
 				&& e.getAnnotation(Target.class) == null
@@ -197,11 +197,16 @@ public class LilleroProcessor extends AbstractProcessor {
 		//initialize the constructor builder
 		MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder();
 
+		List<VariableElement> methodFinders = new ArrayList<>();
+
 		//take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
-			if(type == ProxyType.METHOD && !proxyVar.getAnnotation(Find.class).name().equals("")) //methods will be handled later
+			if(type == ProxyType.METHOD && !proxyVar.getAnnotation(Find.class).name().equals("")) {
+				//methods without a specified name will be handled later
+				methodFinders.add(proxyVar);
 				continue;
+			}
 			//case-specific handling
 			if(type == ProxyType.TYPE) {
 				//find and validate
@@ -216,7 +221,6 @@ public class LilleroProcessor extends AbstractProcessor {
 				);
 			} else if(type == ProxyType.FIELD || type == ProxyType.METHOD)
 				appendMemberFinderDefinition(targetClass, proxyVar, null, constructorBuilder, this.processingEnv, this.mapper);
-			finders.remove(proxyVar); //remove finders that have already been processed
 		}
 
 		//declare it once for efficiency
@@ -227,7 +231,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.collect(Collectors.toList());
 
 		//targets that have matched at least once are put in here
-		Set<ExecutableElement> matchedTargets;
+		Set<ExecutableElement> matchedTargets = new HashSet<>();
 
 		//this will contain the classes to generate: the key is the class name
 		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
@@ -237,7 +241,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			int iterationNumber = 1;
 			for(Target targetAnn : mtgAnn) {
 				List<ExecutableElement> injectorCandidates = injectors;
-				List<VariableElement> finderCandidates = finders;
+				List<VariableElement> finderCandidates = methodFinders;
 
 				if(!targetAnn.of().equals("") && injectorNames.contains(targetAnn.of())) {
 					//case 1: find target by name
@@ -290,10 +294,14 @@ public class LilleroProcessor extends AbstractProcessor {
 						iterationNumber++; //increment is only used by injectors
 					} else {
 						//matched a finder!
-						VariableElement finder = finders.get(0);
-						Find f = finder.getAnnotation(Find.class);
-						appendMemberFinderDefinition(targetClass, finder, tg, constructorBuilder, this.processingEnv, this.mapper);
-						finders.remove(finder); //unlike injectors, finders can't apply to multiple targets
+						appendMemberFinderDefinition(
+							targetClass,
+							finderCandidates.get(0),
+							tg,
+							constructorBuilder,
+							this.processingEnv,
+							this.mapper
+						);
 					}
 				}
 			}
