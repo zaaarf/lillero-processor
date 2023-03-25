@@ -200,7 +200,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
-			if(type == ProxyType.METHOD) //methods will be handled later
+			if(type == ProxyType.METHOD && !proxyVar.getAnnotation(Find.class).name().equals("")) //methods will be handled later
 				continue;
 			//case-specific handling
 			if(type == ProxyType.TYPE) {
@@ -214,7 +214,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
 					mapModifiers(clazz.elem.getModifiers())
 				);
-			} else if(type == ProxyType.FIELD)
+			} else if(type == ProxyType.FIELD || type == ProxyType.METHOD)
 				appendMemberFinderDefinition(targetClass, proxyVar, null, constructorBuilder, this.processingEnv, this.mapper);
 			finders.remove(proxyVar); //remove finders that have already been processed
 		}
@@ -225,6 +225,9 @@ public class LilleroProcessor extends AbstractProcessor {
 				.map(ExecutableElement::getSimpleName)
 				.map(Object::toString)
 				.collect(Collectors.toList());
+
+		//targets that have matched at least once are put in here
+		Set<ExecutableElement> matchedTargets;
 
 		//this will contain the classes to generate: the key is the class name
 		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
@@ -252,8 +255,8 @@ public class LilleroProcessor extends AbstractProcessor {
 					//case 2: there is only one injector
 					finderCandidates = new ArrayList<>(); //no candidates
 					injectorCandidates = new ArrayList<>();
-					injectorCandidates.add(targets.get(0));
-				} else {
+					injectorCandidates.add(injectors.get(0));
+				} else {  //todo match finders based on same name
 					//case 3: try to match by injectTargetName
 					finderCandidates = new ArrayList<>(); //no candidates
 					String inferredName = "inject" + tg.getSimpleName();
@@ -293,7 +296,6 @@ public class LilleroProcessor extends AbstractProcessor {
 						finders.remove(finder); //unlike injectors, finders can't apply to multiple targets
 					}
 				}
-
 			}
 		}
 
