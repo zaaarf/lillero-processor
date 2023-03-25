@@ -243,7 +243,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				List<ExecutableElement> injectorCandidates = injectors;
 				List<VariableElement> finderCandidates = methodFinders;
 
-				if(!targetAnn.of().equals("") && injectorNames.contains(targetAnn.of())) {
+				if(!targetAnn.of().equals("")) {
 					//case 1: find target by name
 					injectorCandidates =
 						injectorCandidates
@@ -311,11 +311,6 @@ public class LilleroProcessor extends AbstractProcessor {
 		for(String injName : toGenerate.keySet()) {
 			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
 			String targetMethodName = findMemberName(targetClass.fqnObf, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
-
-			MethodSpec stubOverride = MethodSpec.overriding(toGenerate.get(injName).targetStub)
-				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
-				.build();
-
 			MethodSpec inject = MethodSpec.methodBuilder("inject")
 				.addModifiers(Modifier.PUBLIC)
 				.returns(void.class)
@@ -341,7 +336,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqn))
 				.addMethod(buildStringReturnMethod("methodName", targetMethodName))
 				.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
-				.addMethod(stubOverride)
+				.addMethods(generateDummies(targets))
 				.addMethod(inject)
 				.build();
 

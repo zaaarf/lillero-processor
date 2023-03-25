@@ -20,6 +20,12 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static ftbsc.lll.processor.tools.ASTUtils.*;
 
 /**
@@ -157,7 +163,7 @@ public class JavaPoetUtils {
 		if(isMethod) {
 			ExecutableElement executableTarget;
 			if(f.name().equals("")) //find and validate from stub
-				executableTarget = findMethodFromStub(stub, null, env);
+				executableTarget = findMethodFromStub(stub, f, env);
 			else { //find and validate by name alone
 				if(LilleroProcessor.badPracticeWarnings) //warn user that he is doing bad stuff
 					env.getMessager().printMessage(Diagnostic.Kind.WARNING,
@@ -211,5 +217,21 @@ public class JavaPoetUtils {
 			var.getSimpleName().toString(),
 			builderName
 		);
+	}
+
+	/**
+	 * Generates a {@link HashSet} of dummy overrides given a {@link Collection} stubs.
+ 	 * @param dummies the stubs
+	 * @return the generated {@link HashSet}
+	 * @since 0.5.0
+	 */
+	public static HashSet<MethodSpec> generateDummies(Collection<ExecutableElement> dummies) {
+		HashSet<MethodSpec> specs = new HashSet<>();
+		for(ExecutableElement d : dummies)
+			specs.add(MethodSpec.overriding(d)
+				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
+				.build()
+			);
+		return specs;
 	}
 }
