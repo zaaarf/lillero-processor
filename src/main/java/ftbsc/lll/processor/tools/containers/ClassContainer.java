@@ -54,7 +54,9 @@ public class ClassContainer {
 			throw new TargetNotFoundException("class", fqn);
 
 		if(innerNames != null) {
+			StringBuilder newFQN = new StringBuilder(fqn);
 			for(String inner : innerNames) {
+				newFQN.append("$").append(inner);
 				try {
 					int anonClassCounter = Integer.parseInt(inner);
 					//anonymous classes cannot be validated!
@@ -80,8 +82,8 @@ public class ClassContainer {
 				if(elem == null)
 					throw new TargetNotFoundException("class", inner);
 			}
-		}
-		this.fqn = fqn;
+			this.fqn = newFQN.toString();
+		} else this.fqn = fqn;
 		this.fqnObf = findClassName(fqn, mapper);
 		this.elem = elem;
 	}
