@@ -212,6 +212,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		//initialize the constructor builder
 		MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder();
+		constructorBuilder.addModifiers(Modifier.PUBLIC);
 
 		List<VariableElement> methodFinders = new ArrayList<>();
 
