@@ -126,6 +126,7 @@ public class ClassContainer {
 	 * @since 0.5.0
 	 */
 	public static ClassContainer findOrFallback(ClassContainer fallback, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		if(f == null) return fallback;
 		ClassContainer cl = ClassContainer.from(f, Find::value, f.className(), env, mapper);
 		return cl.fqn.equals("java.lang.Object")
 			? fallback
