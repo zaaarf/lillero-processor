@@ -84,7 +84,7 @@ public class ClassContainer {
 			}
 			this.fqn = newFQN.toString();
 		} else this.fqn = fqn;
-		this.fqnObf = findClassName(fqn, mapper);
+		this.fqnObf = findClassName(this.fqn, mapper);
 		this.elem = elem;
 	}
 

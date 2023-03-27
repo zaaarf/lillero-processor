@@ -87,7 +87,7 @@ public class FieldContainer {
 		Find f = finder.getAnnotation(Find.class);
 
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from(patchAnn, Patch::value, patchAnn.className(), env, null),
+			ClassContainer.from(patchAnn, Patch::value, patchAnn.className(), env, mapper),
 			f, env, mapper
 		);
 

@@ -92,7 +92,7 @@ public class MethodContainer {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from(patchAnn, Patch::value, patchAnn.className(), env, null),
+			ClassContainer.from(patchAnn, Patch::value, patchAnn.className(), env, mapper),
 			f, env, mapper
 		);
 
