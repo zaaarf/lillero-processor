@@ -25,7 +25,14 @@ public @interface Target {
 	 * @return the name of the element this is supposed to apply to
 	 * @since 0.5.0
 	 */
-	String of() default "";
+	String of();
+
+	/**
+	 * @return a name which overrides the name of the annotated one, may be used in
+	 * 				 cases such as constructors
+	 * @since 0.5.0
+	 */
+	String methodName() default "";
 
 	/**
 	 * When set to false, tells the processor to first try to match a single method by name,

@@ -26,10 +26,10 @@ public @interface Find {
 	Class<?> value() default Object.class;
 
 	/**
-	 * For a {@link TypeProxy}, this can be either the fully-qualified name
-	 * to be used in place of {@link #value()} or an inner class name to append
-	 * after a $ symbol to the already acquired fully-qualified name.
-	 * For others, this is refers to the parent class.
+	 * This can be either the fully-qualified name to be used in place of {@link #value()} to
+	 * represent the parent class or an inner class name to append after a $ symbol to the
+	 * already acquired fully-qualified name.
+	 * For a {@link TypeProxy}, this refers to the class itself rather than the parent.
 	 * @return the name of the inner class that contains the target,
 	 * defaults to empty string (not an inner class)
 	 * @since 0.5.0
@@ -50,4 +50,22 @@ public @interface Find {
 	 * @since 0.5.0
 	 */
 	String name() default "";
+
+	/**
+	 * This overrules the type of a field. Only to be used in the case (such as fields of
+	 * anonymous classes) of fields whose parents cannot be reached at processing time.
+	 * @return a {@link Class} representing the type.
+	 * @deprecated This is only meant as a temporary solution until a better handling
+	 * 					   is implemented; only use this if strictly necessary as it may be
+	 * 					   removed or changed even across revisions.
+	 */
+	@Deprecated
+	Class<?> type() default Object.class;
+
+	/**
+	 * @return the inner class name to be used with {@link #type()}
+	 * @deprecated See {@link #type()}'s deprecation notice for more info.
+	 */
+	@Deprecated
+	String typeInner() default "";
 }

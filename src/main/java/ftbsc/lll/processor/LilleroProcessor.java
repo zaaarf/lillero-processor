@@ -10,6 +10,7 @@ import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
+import ftbsc.lll.processor.tools.containers.MethodContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
@@ -39,7 +40,7 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@SupportedOptions({"mappingsFile", "badPracticeWarnings"})
+@SupportedOptions({"mappingsFile", "badPracticeWarnings", "anonymousClassWarning"})
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -58,6 +59,12 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * bad practices.
 	 */
 	public static boolean badPracticeWarnings = true;
+
+	/**
+	 * Whether the processor should issue warnings when compiling code anonymous
+	 * classes which can't be checked for validity.
+	 */
+	public static boolean anonymousClassWarning = true;
 
 	/**
 	 * Initializes the processor with the processing environment by
@@ -98,13 +105,24 @@ public class LilleroProcessor extends AbstractProcessor {
 		String warns = processingEnv.getOptions().get("badPracticeWarnings");
 		if(warns == null)
 			badPracticeWarnings = true;
-		else {
-			try { // 0 = false, any other integer = true
-				int i = Integer.parseInt(warns);
-				badPracticeWarnings = i != 0;
-			} catch(NumberFormatException ignored) {
-				badPracticeWarnings = Boolean.parseBoolean(warns);
-			}
+		else badPracticeWarnings = parseBooleanArg(warns);
+		String anonymousClassWarn = processingEnv.getOptions().get("anonymousClassWarning");
+		if(anonymousClassWarn == null)
+			anonymousClassWarning = true;
+		else anonymousClassWarning = parseBooleanArg(anonymousClassWarn);
+	}
+
+	/**
+	 * Parses a boolean arg from a String.
+	 * @param arg the arg to parse
+	 * @return the parsed boolean
+	 */
+	private static boolean parseBooleanArg(String arg) {
+		try { // 0 = false, any other integer = true
+			int i = Integer.parseInt(arg);
+			return i != 0;
+		} catch(NumberFormatException ignored) {
+			return Boolean.parseBoolean(arg);
 		}
 	}
 
@@ -174,14 +192,13 @@ public class LilleroProcessor extends AbstractProcessor {
 	private void generateClasses(TypeElement cl) {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
-		ClassContainer targetClass = new ClassContainer(
-			getClassFullyQualifiedName(
-				patchAnn,
-				Patch::value,
-				patchAnn.className()
-			), this.processingEnv, this.mapper
+		ClassContainer targetClass = ClassContainer.from(
+			patchAnn,
+			Patch::value,
+			patchAnn.className(),
+			this.processingEnv,
+			this.mapper
 		);
-
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
 		while (packageElement.getKind() != ElementKind.PACKAGE)
@@ -209,17 +226,17 @@ public class LilleroProcessor extends AbstractProcessor {
 			//case-specific handling
 			if(type == ProxyType.TYPE) {
 				//find and validate
-				ClassContainer clazz = findClassOrFallback(targetClass, proxyVar.getAnnotation(Find.class), this.processingEnv, this.mapper);
+				ClassContainer clazz = ClassContainer.findOrFallback(targetClass, proxyVar.getAnnotation(Find.class), this.processingEnv, this.mapper);
 				//types can be generated with a single instruction
 				constructorBuilder.addStatement(
 					"super.$L = $T.from($S, 0, $L)",
 					proxyVar.getSimpleName().toString(),
 					TypeProxy.class,
 					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
-					mapModifiers(clazz.elem.getModifiers())
+					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
 			} else if(type == ProxyType.FIELD || type == ProxyType.METHOD)
-				appendMemberFinderDefinition(targetClass, proxyVar, null, constructorBuilder, this.processingEnv, this.mapper);
+				appendMemberFinderDefinition(targetClass, proxyVar, null, null, constructorBuilder, this.processingEnv, this.mapper);
 		}
 
 		//this will contain the classes to generate: the key is the class name
@@ -236,36 +253,17 @@ public class LilleroProcessor extends AbstractProcessor {
 				List<ExecutableElement> injectorCandidates = injectors;
 				List<VariableElement> finderCandidates = methodFinders;
 
-				if(!targetAnn.of().equals("")) {
-					//case 1: find target by name
-					injectorCandidates =
-						injectorCandidates
-							.stream()
-							.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
-							.collect(Collectors.toList());
-					finderCandidates =
-						finderCandidates
-							.stream()
-							.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
-							.collect(Collectors.toList());
-				} else if(injectors.size() == 1 && targets.size() == 1) {
-					//case 2: there is only one target, must use it for that injector
-					finderCandidates = new ArrayList<>(); //no candidates
-					injectorCandidates = new ArrayList<>();
-					injectorCandidates.add(injectors.get(0));
-				} else {
-					//case 3: try to match by injectTargetName or same name for finders
-					injectorCandidates =
-						injectorCandidates
-							.stream()
-							.filter(t -> t.getSimpleName().toString().equalsIgnoreCase("inject" + tg.getSimpleName()))
-							.collect(Collectors.toList());
-					finderCandidates =
-						finderCandidates
-							.stream()
-							.filter(t -> t.getSimpleName().contentEquals(tg.getSimpleName()))
-							.collect(Collectors.toList());
-				}
+				//find target by name
+				injectorCandidates =
+					injectorCandidates
+						.stream()
+						.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
+						.collect(Collectors.toList());
+				finderCandidates =
+					finderCandidates
+						.stream()
+						.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
+						.collect(Collectors.toList());
 
 				//throw exception if user is a moron and defined a finder and an injector with the same name
 				if(finderCandidates.size() != 0 && injectorCandidates.size() != 0)
@@ -274,7 +272,13 @@ public class LilleroProcessor extends AbstractProcessor {
 					);
 				else if(finderCandidates.size() == 0 && injectorCandidates.size() == 0)
 					processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-						String.format("Found orphan @Target annotation on method %s, it will be ignored!", tg.getSimpleName().toString()));
+						String.format(
+							"Found orphan @Target annotation on method %s.%s pointing at method %s, it will be ignored!",
+							cl.getSimpleName().toString(),
+							tg.getSimpleName().toString(),
+							targetAnn.of()
+						)
+					);
 				else if(finderCandidates.size() == 0 && injectorCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate injectors for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
@@ -290,7 +294,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injector, tg)
+							new InjectorInfo(injector, tg, targetAnn)
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
@@ -301,6 +305,7 @@ public class LilleroProcessor extends AbstractProcessor {
 							targetClass,
 							finder,
 							tg,
+							targetAnn,
 							constructorBuilder,
 							this.processingEnv,
 							this.mapper
@@ -320,8 +325,6 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
-			String targetMethodDescriptor = descriptorFromExecutableElement(toGenerate.get(injName).target);
-			String targetMethodName = findMemberName(targetClass.fqnObf, toGenerate.get(injName).target.getSimpleName().toString(), targetMethodDescriptor, this.mapper);
 			MethodSpec inject = MethodSpec.methodBuilder("inject")
 				.addModifiers(Modifier.PUBLIC)
 				.returns(void.class)
@@ -345,8 +348,8 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
 				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", targetMethodName))
-				.addMethod(buildStringReturnMethod("methodDesc", targetMethodDescriptor))
+				.addMethod(buildStringReturnMethod("methodName", toGenerate.get(injName).target.name))
+				.addMethod(buildStringReturnMethod("methodDesc", toGenerate.get(injName).target.descriptor))
 				.addMethods(generateDummies(targets))
 				.addMethod(inject)
 				.build();
@@ -405,20 +408,21 @@ public class LilleroProcessor extends AbstractProcessor {
 		public final String reason;
 
 		/**
-		 * The {@link ExecutableElement} corresponding to the target method.
+		 * The {@link MethodContainer} corresponding to the target method.
 		 */
-		private final ExecutableElement target;
+		private final MethodContainer target;
 
 		/**
 		 * Public constructor.
 		 * @param injector the injector {@link ExecutableElement}
 		 * @param targetStub the target {@link ExecutableElement}
+		 * @param targetAnn the relevant {@link Target} annotation
 		 */
-		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub) {
+		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub, Target targetAnn) {
 			this.injector = injector;
 			this.targetStub = targetStub;
 			this.reason = injector.getAnnotation(Injector.class).reason();
-			this.target = findMethodFromStub(targetStub, null, processingEnv);
+			this.target = MethodContainer.from(targetStub, targetAnn, null, processingEnv, mapper);
 		}
 	}
 }

@@ -1,10 +1,11 @@
 package ftbsc.lll.processor.tools;
 
 import com.squareup.javapoet.*;
-import ftbsc.lll.processor.LilleroProcessor;
 import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.processor.tools.containers.ArrayContainer;
+import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
+import ftbsc.lll.processor.tools.containers.FieldContainer;
+import ftbsc.lll.processor.tools.containers.MethodContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.FieldProxy;
@@ -16,13 +17,12 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.tools.Diagnostic;
 import java.util.Collection;
 import java.util.HashSet;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.tools.ASTUtils.getProxyType;
+import static ftbsc.lll.processor.tools.ASTUtils.mapModifiers;
 
 /**
  * Collection of static utils that rely on JavaPoet to function.
@@ -105,75 +105,44 @@ public class JavaPoetUtils {
 	}
 
 	/**
-	 * Adds to the given {@link MethodSpec.Builder} the given line of code,
-	 * containing a call to a method of a {@link MethodProxy.Builder} or a
-	 * {@link FieldProxy.Builder}.
-	 * @param b the {@link MethodSpec.Builder}
-	 * @param proxyBuilderName the name of the proxy builder
-	 * @param proxyBuilderMethod the method to call
-	 * @param t the {@link TypeMirror} to add
-	 * @since 0.4.0
-	 */
-	public static void addTypeToProxyGenerator(MethodSpec.Builder b, String proxyBuilderName, String proxyBuilderMethod, TypeMirror t) {
-		String insn = String.format("%s.%s", proxyBuilderName, proxyBuilderMethod);
-		if(t.getKind().isPrimitive() || t.getKind() == TypeKind.VOID)
-			b.addStatement(insn + "($T.class)", t);
-		else {
-			ArrayContainer arr = new ArrayContainer(t);
-			TypeName type = TypeName.get(arr.innermostComponent);
-			if(type instanceof ParameterizedTypeName)
-				type = ((ParameterizedTypeName) type).rawType;
-			b.addStatement(
-				insn + "($S, $L)",
-				type.toString(),
-				arr.arrayLevel
-			);
-		}
-	}
-
-	/**
 	 * Appends to a given {@link MethodSpec.Builder} definitions for a proxy.
 	 * @param fallback the {@link ClassContainer} to fall back on
 	 * @param var the {@link VariableElement} representing the proxy
 	 * @param stub the stub {@link ExecutableElement} if present or relevant, null otherwise
+	 * @param t the {@link Target} relevant to this finder if present or relevant, null otherwise
 	 * @param con the {@link MethodSpec.Builder} to append to
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @since 0.5.0
 	 */
 	public static void appendMemberFinderDefinition(
-		ClassContainer fallback, VariableElement var, ExecutableElement stub, MethodSpec.Builder con, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		ClassContainer fallback, VariableElement var, ExecutableElement stub, Target t,
+		MethodSpec.Builder con, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		ProxyType type = getProxyType(var);
 		if(type != ProxyType.METHOD && type != ProxyType.FIELD)
-			return; //this method is irrelevant to everyoen else
+			return; //this method is irrelevant to everyone else
 
 		//we need this stuff
 		Find f = var.getAnnotation(Find.class);
-		ClassContainer parent = findClassOrFallback(fallback, f, env, mapper);
 		final boolean isMethod = type == ProxyType.METHOD;
 		final String builderName = var.getSimpleName().toString() + "Builder";
 
-		String name, nameObf;
+		String descriptor, nameObf;
+		ClassContainer parent;
 		Element target;
 
 		if(isMethod) {
-			ExecutableElement executableTarget;
-			if(f.name().equals("")) //find and validate from stub
-				executableTarget = findMethodFromStub(stub, f, env);
-			else { //find and validate by name alone
-				if(LilleroProcessor.badPracticeWarnings) //warn user that he is doing bad stuff
-					env.getMessager().printMessage(Diagnostic.Kind.WARNING,
-						String.format("Matching method %s by name, this is bad practice and may lead to unexpected behaviour. Use @Target stubs instead!", f.name()));
-				executableTarget = (ExecutableElement) findMember(parent.fqn, f.name(), null, false, false, env);
-			}
-			name = executableTarget.getSimpleName().toString();
-			nameObf = findMemberName(parent.fqnObf, name, descriptorFromExecutableElement(executableTarget), mapper);
-			target = executableTarget;
+			MethodContainer mc = MethodContainer.from(stub, t, f, env, mapper);
+			descriptor = mc.descriptor;
+			nameObf = mc.nameObf;
+			parent = mc.parent;
+			target = mc.elem;
 		} else {
-			//find and validate target
-			name = f.name().equals("") ? var.getSimpleName().toString() : f.name();
-			target = findMember(parent.fqn, name, null, false, true, env);
-			nameObf = findMemberName(parent.fqnObf, name, null, mapper);
+			FieldContainer fc = FieldContainer.from(var, env, mapper);
+			descriptor = fc.descriptor;
+			nameObf = fc.nameObf;
+			parent = fc.parent;
+			target = fc.elem;
 		}
 
 		//initialize builder
@@ -189,23 +158,22 @@ public class JavaPoetUtils {
 			"$L.setParent($S, $L)",
 			builderName,
 			parent.fqnObf,
-			mapModifiers(parent.elem.getModifiers())
+			parent.elem == null ? 0 : mapModifiers(parent.elem.getModifiers())
 		);
 
 		//set modifiers
 		con.addStatement(
 			"$L.setModifiers($L)",
 			builderName,
-			mapModifiers(target.getModifiers())
+			target == null ? 0 :mapModifiers(target.getModifiers())
 		);
 
-		if(isMethod) { //set parameters and return type
-			ExecutableElement executableTarget = (ExecutableElement) target;
-			for(VariableElement p : executableTarget.getParameters())
-				addTypeToProxyGenerator(con,	builderName, "addParameter", p.asType());
-			addTypeToProxyGenerator(con, builderName, "setReturnType", executableTarget.getReturnType());
-		} else //set type
-			addTypeToProxyGenerator(con,builderName, "setType", target.asType());
+		//set type(s)
+		con.addStatement(
+			"$L.setDescriptor($S)",
+			builderName,
+			descriptor
+		);
 
 		//build and set
 		con.addStatement(

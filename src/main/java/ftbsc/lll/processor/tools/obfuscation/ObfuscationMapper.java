@@ -180,8 +180,16 @@ public class ObfuscationMapper {
 		 * @throws AmbiguousDefinitionException if not enough data was given to uniquely identify a mapping
 		 */
 		public String get(String memberName, String methodDescriptor) {
-			if(methodDescriptor == null)
-				return members.get(memberName);
+			if(methodDescriptor == null) {
+				String res = members.get(memberName);
+				if(res != null) return res;
+				else {
+					List<String> candidates = members.keySet().stream().filter(k -> k.startsWith(memberName)).collect(Collectors.toList());
+					if(candidates.size() == 1)
+						return candidates.get(0);
+					else throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + this.unobf + "::" + memberName);
+				}
+			}
 			List<String> candidates = members.keySet().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
 			if(candidates.size() == 1)
 				return members.get(candidates.get(0));
@@ -193,7 +201,7 @@ public class ObfuscationMapper {
 				case 1:
 					return members.get(candidates.get(0));
 				default:
-					throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + unobf + "::" + memberName);
+					throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + this.unobf + "::" + memberName);
 			}
 		}
 	}
