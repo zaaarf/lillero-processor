@@ -100,7 +100,10 @@ public class FieldContainer {
 			if(fieldType.getKind() == TypeKind.DECLARED)
 				descriptor = //jank af but this is temporary anyway
 					"L" + new ClassContainer(
-						fieldType.toString(), f.typeInner().split("//$"), env, mapper
+						fieldType.toString(),
+						f.typeInner().equals("") ? null : f.typeInner().split("//$"),
+						env,
+						mapper
 					).fqn.replace('.', '/') + ";";
 			else descriptor = descriptorFromType(fieldType);
 		}
