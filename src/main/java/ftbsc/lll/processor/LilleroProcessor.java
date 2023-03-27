@@ -166,19 +166,25 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
 	private boolean isValidInjector(TypeElement elem) {
-		TypeMirror classNodeType = processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
-		TypeMirror methodNodeType = processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
+		Patch p = elem.getAnnotation(Patch.class);
+		if(getTypeFromAnnotation(p, Patch::value, this.processingEnv).toString().equals("java.lang.Object") && p.className().equals("")) {
+			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+				String.format("Empty @Patch annotation on class %s, skipping.", elem));
+			return false;
+		}
+		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
+		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
 		if (elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
 			&& elem.getEnclosedElements().stream().filter(e -> e instanceof ExecutableElement).anyMatch(e -> {
 			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
 			return e.getAnnotation(Injector.class) != null
 				&& e.getAnnotation(Target.class) == null
 				&& params.size() == 2
-				&& processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
-				&& processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
+				&& this.processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
+				&& this.processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
 		})) return true;
 		else {
-			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
