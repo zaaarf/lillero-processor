@@ -192,10 +192,11 @@ public class JavaPoetUtils {
 	public static HashSet<MethodSpec> generateDummies(Collection<ExecutableElement> dummies) {
 		HashSet<MethodSpec> specs = new HashSet<>();
 		for(ExecutableElement d : dummies)
-			specs.add(MethodSpec.overriding(d)
-				.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
-				.build()
-			);
+			if(d.getModifiers().contains(Modifier.ABSTRACT))
+				specs.add(MethodSpec.overriding(d)
+					.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
+					.build()
+				);
 		return specs;
 	}
 }
