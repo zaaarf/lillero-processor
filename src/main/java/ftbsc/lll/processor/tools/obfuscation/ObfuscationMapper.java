@@ -89,10 +89,7 @@ public class ObfuscationMapper {
 		ObfuscationData data = mapper.get(parentName.replace('.', '/'));
 		if(data == null)
 			throw new MappingNotFoundException(parentName + "::" + memberName);
-		String member = data.get(memberName, methodDescriptor);
-		if(member == null)
-			throw new MappingNotFoundException(parentName + "::" + memberName);
-		return member;
+		return data.get(memberName, methodDescriptor);
 	}
 
 	/**
@@ -231,28 +228,29 @@ public class ObfuscationMapper {
 		 * @throws AmbiguousDefinitionException if not enough data was given to uniquely identify a mapping
 		 */
 		public String get(String memberName, String methodDescriptor) {
-			if(methodDescriptor == null) {
-				String res = members.get(memberName);
-				if(res != null) return res;
-				else {
-					List<String> candidates = members.keySet().stream().filter(k -> k.startsWith(memberName)).collect(Collectors.toList());
-					if(candidates.size() == 1)
-						return candidates.get(0);
-					else throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + this.unobf + "::" + memberName);
-				}
-			}
+			//find all keys that start with the name
 			List<String> candidates = members.keySet().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
-			if(candidates.size() == 1)
-				return members.get(candidates.get(0));
-			String signature = memberName + " " + methodDescriptor;
-			candidates = candidates.stream().filter(m -> m.startsWith(signature)).collect(Collectors.toList());
+			if(methodDescriptor != null) {
+				String signature = String.format("%s %s", memberName, methodDescriptor);
+				candidates = candidates.stream().filter(m -> m.equals(signature)).collect(Collectors.toList());
+			}
 			switch(candidates.size()) {
 				case 0:
-					return null;
+					throw new MappingNotFoundException(String.format(
+						"%s.%s%s",
+						this.unobf,
+						memberName,
+						methodDescriptor == null ? "" : "()"
+					));
 				case 1:
 					return members.get(candidates.get(0));
 				default:
-					throw new AmbiguousDefinitionException("Mapper could not uniquely identify method " + this.unobf + "::" + memberName);
+					throw new AmbiguousDefinitionException(String.format(
+						"Mapper could not uniquely identify member %s.%s%s",
+						this.unobf,
+						memberName,
+						methodDescriptor == null ? "" : "()"
+					));
 			}
 		}
 	}

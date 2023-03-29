@@ -134,7 +134,7 @@ public class ASTUtils {
 
 	/**
 	 * Finds the member name and maps it to the correct format.
-	 * @param parentFQN the already mapped FQN of the parent class
+	 * @param parentFQN the unobfuscated FQN of the parent class
 	 * @param memberName the name of the member
 	 * @param methodDescriptor the descriptor of the method, may be null
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null

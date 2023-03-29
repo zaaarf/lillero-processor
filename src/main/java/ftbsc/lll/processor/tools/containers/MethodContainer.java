@@ -81,7 +81,7 @@ public class MethodContainer {
 			this.descriptor = descriptorFromExecutableElement(this.elem);
 			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
 		}
-		this.nameObf = findMemberName(parent.fqnObf, name, descriptor, mapper);
+		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, mapper);
 	}
 
 	/**
