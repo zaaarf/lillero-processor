@@ -2,6 +2,8 @@ package ftbsc.lll.processor.tools.obfuscation;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
+import ftbsc.lll.tools.DescriptorBuilder;
+import org.objectweb.asm.Type;
 
 import java.util.HashMap;
 import java.util.List;
@@ -91,6 +93,55 @@ public class ObfuscationMapper {
 		if(member == null)
 			throw new MappingNotFoundException(parentName + "::" + memberName);
 		return member;
+	}
+
+	/**
+	 * Obfuscates a method descriptor, replacing its class references
+	 * with their obfuscated counterparts.
+	 * @param descriptor a {@link String} containing the descriptor
+	 * @return the obfuscated descriptor
+	 * @since 0.5.1
+	 */
+	public String obfuscateMethodDescriptor(String descriptor) {
+		Type method = Type.getMethodType(descriptor);
+		Type[] arguments = method.getArgumentTypes();
+		Type returnType = method.getReturnType();
+
+		Type[] obfArguments = new Type[arguments.length];
+		for(int i = 0; i < obfArguments.length; i++)
+			obfArguments[i] = this.obfuscateType(arguments[i]);
+
+		return Type.getMethodDescriptor(this.obfuscateType(returnType), obfArguments);
+	}
+
+	/**
+	 * Given a {@link Type} it returns its obfuscated counterpart.
+	 * @param type the type in question
+	 * @return the obfuscated type
+	 * @since 0.5.1
+	 */
+	public Type obfuscateType(Type type) {
+		//unwrap arrays
+		Type unwrapped = type;
+		int arrayLevel = 0;
+		while(unwrapped.getSort() == org.objectweb.asm.Type.ARRAY) {
+			unwrapped = unwrapped.getElementType();
+			arrayLevel++;
+		}
+
+		//if it's a primitive no operation is needed
+		if(type.getSort() < org.objectweb.asm.Type.ARRAY)
+			return type;
+
+		String internalName = type.getInternalName();
+
+		String internalNameObf;
+		try {
+			internalNameObf = this.obfuscateClass(internalName);
+			return Type.getType(DescriptorBuilder.nameToDescriptor(internalNameObf, arrayLevel));
+		} catch(MappingNotFoundException e) {
+			return type;
+		}
 	}
 
 	/**

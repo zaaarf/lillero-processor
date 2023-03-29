@@ -63,11 +63,12 @@ public class FieldContainer {
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for fields of unverifiable classes!");
 			this.elem = null;
 			this.name = name;
-			this.descriptor = descriptor;
+			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(descriptor);
 		} else {
 			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromType(this.elem.asType());
+			String validatedDescriptor = descriptorFromType(this.elem.asType());
+			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(validatedDescriptor);
 		}
 		this.nameObf = findMemberName(parent.fqnObf, name, descriptor, mapper);
 	}

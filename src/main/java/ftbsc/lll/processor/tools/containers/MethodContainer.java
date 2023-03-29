@@ -67,11 +67,12 @@ public class MethodContainer {
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
 			this.elem = null;
 			this.name = name;
-			this.descriptor = descriptor;
+			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(descriptor);
 		} else {
 			this.elem = (ExecutableElement) findMember(parent, name, descriptor, descriptor != null && strict, false);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromExecutableElement(this.elem);
+			String validatedDescriptor = descriptorFromExecutableElement(this.elem);
+			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(validatedDescriptor);
 		}
 		this.nameObf = findMemberName(parent.fqnObf, name, descriptor, mapper);
 	}
