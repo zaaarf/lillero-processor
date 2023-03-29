@@ -39,6 +39,12 @@ public class MethodContainer {
 	public final String nameObf;
 
 	/**
+	 * The obfuscated descriptor of the field.
+	 * If the mapper passed is null, then this will be identical to {@link #descriptor}.
+	 */
+	public final String descriptorObf;
+
+	/**
 	 * The {@link ClassContainer} representing the parent of this method.
 	 * May be null if the parent is a class type that can not be checked
 	 * at processing time (such as an anonymous class)
@@ -67,12 +73,13 @@ public class MethodContainer {
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
 			this.elem = null;
 			this.name = name;
-			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(descriptor);
+			this.descriptor = descriptor;
+			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
 		} else {
 			this.elem = (ExecutableElement) findMember(parent, name, descriptor, descriptor != null && strict, false);
 			this.name = this.elem.getSimpleName().toString();
-			String validatedDescriptor = descriptorFromExecutableElement(this.elem);
-			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(validatedDescriptor);
+			this.descriptor = descriptorFromExecutableElement(this.elem);
+			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
 		}
 		this.nameObf = findMemberName(parent.fqnObf, name, descriptor, mapper);
 	}

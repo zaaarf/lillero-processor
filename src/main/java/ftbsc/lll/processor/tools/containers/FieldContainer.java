@@ -4,6 +4,7 @@ import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import org.objectweb.asm.Type;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.VariableElement;
@@ -11,6 +12,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
 import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromType;
 
 /**
@@ -34,6 +36,12 @@ public class FieldContainer {
 	 * If the mapper passed is null, then this will be identical to {@link #name}.
 	 */
 	public final String nameObf;
+
+	/**
+	 * The obfuscated descriptor of the field.
+	 * If the mapper passed is null, then this will be identical to {@link #descriptor}.
+	 */
+	public final String descriptorObf;
 
 	/**
 	 * The {@link ClassContainer} representing the parent of this field.
@@ -63,12 +71,13 @@ public class FieldContainer {
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for fields of unverifiable classes!");
 			this.elem = null;
 			this.name = name;
-			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(descriptor);
+			this.descriptor = descriptor;
+			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
 		} else {
 			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true);
 			this.name = this.elem.getSimpleName().toString();
-			String validatedDescriptor = descriptorFromType(this.elem.asType());
-			this.descriptor = mapper == null ? descriptor : mapper.obfuscateMethodDescriptor(validatedDescriptor);
+			this.descriptor = descriptorFromType(this.elem.asType());
+			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
 		}
 		this.nameObf = findMemberName(parent.fqnObf, name, descriptor, mapper);
 	}

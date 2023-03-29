@@ -354,9 +354,9 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", toGenerate.get(injName).target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", toGenerate.get(injName).target.descriptor))
+				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqnObf))
+				.addMethod(buildStringReturnMethod("methodName", toGenerate.get(injName).target.nameObf))
+				.addMethod(buildStringReturnMethod("methodDesc", toGenerate.get(injName).target.descriptorObf))
 				.addMethods(generateDummies(targets))
 				.addMethod(inject)
 				.build();

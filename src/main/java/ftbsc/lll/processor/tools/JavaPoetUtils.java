@@ -127,19 +127,19 @@ public class JavaPoetUtils {
 		final boolean isMethod = type == ProxyType.METHOD;
 		final String builderName = var.getSimpleName().toString() + "Builder";
 
-		String descriptor, nameObf;
+		String descriptorObf, nameObf;
 		ClassContainer parent;
 		Element target;
 
 		if(isMethod) {
 			MethodContainer mc = MethodContainer.from(stub, t, f, env, mapper);
-			descriptor = mc.descriptor;
+			descriptorObf = mc.descriptorObf;
 			nameObf = mc.nameObf;
 			parent = mc.parent;
 			target = mc.elem;
 		} else {
 			FieldContainer fc = FieldContainer.from(var, env, mapper);
-			descriptor = fc.descriptor;
+			descriptorObf = fc.descriptorObf;
 			nameObf = fc.nameObf;
 			parent = fc.parent;
 			target = fc.elem;
@@ -172,7 +172,7 @@ public class JavaPoetUtils {
 		con.addStatement(
 			"$L.setDescriptor($S)",
 			builderName,
-			descriptor
+			descriptorObf
 		);
 
 		//build and set
