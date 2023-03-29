@@ -40,7 +40,7 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@SupportedOptions({"mappingsFile", "badPracticeWarnings", "anonymousClassWarning"})
+@SupportedOptions({"mappingsFile", "badPracticeWarnings", "anonymousClassWarning", "obfuscateInjectorMetadata"})
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -65,6 +65,12 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * classes which can't be checked for validity.
 	 */
 	public static boolean anonymousClassWarning = true;
+
+	/**
+	 * Whether injector metadata (what is returned by the functions of {@link IInjector})
+	 * is to use obfuscated names instead of its normal names.
+	 */
+	public static boolean obfuscateInjectorMetadata = false;
 
 	/**
 	 * Initializes the processor with the processing environment by
@@ -103,13 +109,14 @@ public class LilleroProcessor extends AbstractProcessor {
 				StandardCharsets.UTF_8)).lines());
 		}
 		String warns = processingEnv.getOptions().get("badPracticeWarnings");
-		if(warns == null)
-			badPracticeWarnings = true;
-		else badPracticeWarnings = parseBooleanArg(warns);
+		if(warns != null)
+			badPracticeWarnings = parseBooleanArg(warns);
 		String anonymousClassWarn = processingEnv.getOptions().get("anonymousClassWarning");
-		if(anonymousClassWarn == null)
-			anonymousClassWarning = true;
-		else anonymousClassWarning = parseBooleanArg(anonymousClassWarn);
+		if(anonymousClassWarn != null)
+			anonymousClassWarning = parseBooleanArg(anonymousClassWarn);
+		String obfuscateInj = processingEnv.getOptions().get("obfuscateInjectorMetadata");
+		if(obfuscateInj != null)
+			obfuscateInjectorMetadata = parseBooleanArg(obfuscateInj);
 	}
 
 	/**
@@ -347,6 +354,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addStatement(String.format("super.%s(clazz, main)", toGenerate.get(injName).injector.getSimpleName()), TypeName.get(cl.asType()))
 				.build();
 
+			MethodContainer target = toGenerate.get(injName).target;
 			TypeSpec injectorClass = TypeSpec.classBuilder(injName)
 				.addModifiers(Modifier.PUBLIC)
 				.superclass(cl.asType())
@@ -354,9 +362,9 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", targetClass.fqnObf))
-				.addMethod(buildStringReturnMethod("methodName", toGenerate.get(injName).target.nameObf))
-				.addMethod(buildStringReturnMethod("methodDesc", toGenerate.get(injName).target.descriptorObf))
+				.addMethod(buildStringReturnMethod("targetClass", obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
+				.addMethod(buildStringReturnMethod("methodName", obfuscateInjectorMetadata ? target.nameObf : target.name))
+				.addMethod(buildStringReturnMethod("methodDesc", obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
 				.addMethods(generateDummies(targets))
 				.addMethod(inject)
 				.build();
