@@ -188,12 +188,19 @@ public class ObfuscationMapper {
 		 * @throws AmbiguousDefinitionException if not enough data was given to uniquely identify a mapping
 		 */
 		public String get(String memberName, String methodDescriptor) {
+
 			//find all keys that start with the name
-			List<String> candidates = members.keySet().stream().filter(m -> m.equals(memberName.split(" ")[0])).collect(Collectors.toList());
+			List<String> candidates = members.keySet().stream().filter(
+				m -> m.split(" ")[0].equals(memberName)
+			).collect(Collectors.toList());
+
 			if(methodDescriptor != null) {
 				String signature = String.format("%s %s", memberName, methodDescriptor);
-				candidates = candidates.stream().filter(m -> m.equals(signature)).collect(Collectors.toList());
+				candidates = candidates.stream().filter(
+					m -> m.equals(signature)
+				).collect(Collectors.toList());
 			}
+
 			switch(candidates.size()) {
 				case 0:
 					throw new MappingNotFoundException(String.format(
