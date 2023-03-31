@@ -189,7 +189,7 @@ public class ObfuscationMapper {
 		 */
 		public String get(String memberName, String methodDescriptor) {
 			//find all keys that start with the name
-			List<String> candidates = members.keySet().stream().filter(m -> m.startsWith(memberName)).collect(Collectors.toList());
+			List<String> candidates = members.keySet().stream().filter(m -> m.equals(memberName.split(" ")[0])).collect(Collectors.toList());
 			if(methodDescriptor != null) {
 				String signature = String.format("%s %s", memberName, methodDescriptor);
 				candidates = candidates.stream().filter(m -> m.equals(signature)).collect(Collectors.toList());
@@ -206,10 +206,11 @@ public class ObfuscationMapper {
 					return members.get(candidates.get(0));
 				default:
 					throw new AmbiguousDefinitionException(String.format(
-						"Mapper could not uniquely identify member %s.%s%s",
+						"Mapper could not uniquely identify member %s.%s%s, found %d!",
 						this.unobf,
 						memberName,
-						methodDescriptor == null ? "" : "()"
+						methodDescriptor == null ? "" : "()",
+						candidates.size()
 					));
 			}
 		}
