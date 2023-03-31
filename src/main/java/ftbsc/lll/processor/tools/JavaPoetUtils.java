@@ -10,14 +10,12 @@ import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.FieldProxy;
 import ftbsc.lll.proxies.impl.MethodProxy;
-import ftbsc.lll.tools.DescriptorBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeMirror;
 import java.util.Collection;
 import java.util.HashSet;
 
@@ -44,69 +42,7 @@ public class JavaPoetUtils {
 	}
 
 	/**
-	 * Builds a type descriptor from the given {@link TypeName}.
-	 * @param type the {@link TypeName} representing the desired type
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromType(TypeName type) {
-		StringBuilder desc = new StringBuilder();
-		//add array brackets
-		while(type instanceof ArrayTypeName) {
-			desc.append("[");
-			type = ((ArrayTypeName) type).componentType;
-		}
-		if(type instanceof ClassName || type instanceof ParameterizedTypeName) {
-			ClassName var = type instanceof ParameterizedTypeName ? ((ParameterizedTypeName) type).rawType : (ClassName) type;
-			desc.append(DescriptorBuilder.nameToDescriptor(var.canonicalName(), 0));
-		} else {
-			if(TypeName.BOOLEAN.equals(type))
-				desc.append("Z");
-			else if(TypeName.CHAR.equals(type))
-				desc.append("C");
-			else if(TypeName.BYTE.equals(type))
-				desc.append("B");
-			else if(TypeName.SHORT.equals(type))
-				desc.append("S");
-			else if(TypeName.INT.equals(type))
-				desc.append("I");
-			else if(TypeName.FLOAT.equals(type))
-				desc.append("F");
-			else if(TypeName.LONG.equals(type))
-				desc.append("J");
-			else if(TypeName.DOUBLE.equals(type))
-				desc.append("D");
-			else if(TypeName.VOID.equals(type))
-				desc.append("V");
-		}
-		return desc.toString();
-	}
-
-	/**
-	 * Builds a type descriptor from the given {@link TypeMirror}.
-	 * @param t the {@link TypeMirror} representing the desired type
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromType(TypeMirror t) {
-		return descriptorFromType(TypeName.get(t));
-	}
-
-	/**
-	 * Builds a method descriptor from the given {@link ExecutableElement}.
-	 * @param m the {@link ExecutableElement} for the method
-	 * @return a {@link String} containing the relevant descriptor
-	 */
-	public static String descriptorFromExecutableElement(ExecutableElement m) {
-		StringBuilder methodSignature = new StringBuilder();
-		methodSignature.append("(");
-		m.getParameters().forEach(p -> methodSignature.append(descriptorFromType(p.asType())));
-		methodSignature.append(")");
-		methodSignature.append(descriptorFromType(m.getReturnType()));
-		return methodSignature.toString();
-	}
-
-	/**
 	 * Appends to a given {@link MethodSpec.Builder} definitions for a proxy.
-	 * @param fallback the {@link ClassContainer} to fall back on
 	 * @param var the {@link VariableElement} representing the proxy
 	 * @param stub the stub {@link ExecutableElement} if present or relevant, null otherwise
 	 * @param t the {@link Target} relevant to this finder if present or relevant, null otherwise
@@ -116,7 +52,7 @@ public class JavaPoetUtils {
 	 * @since 0.5.0
 	 */
 	public static void appendMemberFinderDefinition(
-		ClassContainer fallback, VariableElement var, ExecutableElement stub, Target t,
+		VariableElement var, ExecutableElement stub, Target t,
 		MethodSpec.Builder con, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		ProxyType type = getProxyType(var);
 		if(type != ProxyType.METHOD && type != ProxyType.FIELD)

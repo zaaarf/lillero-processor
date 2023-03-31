@@ -8,22 +8,16 @@ import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
+import ftbsc.lll.tools.DescriptorBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.MirroredTypeException;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromType;
 
 /**
  * Collection of AST-related static utils that didn't really fit into the main class.
@@ -111,10 +105,127 @@ public class ASTUtils {
 		T ann, Function<T, Class<?>> classFunction, ProcessingEnvironment env) {
 		try {
 			String fqn = classFunction.apply(ann).getCanonicalName();
+			if(fqn == null)
+				fqn = "";
 			return env.getElementUtils().getTypeElement(fqn).asType();
 		} catch(MirroredTypeException e) {
 			return e.getTypeMirror();
 		}
+	}
+
+	/**
+	 * Gets the internal name from an {@link Element}.
+	 * @param elem the {@link Element} in question
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the internal name at compile time, or null if it wasn't a qualifiable
+	 * @since 0.5.1
+	 */
+	public static String internalNameFromElement(Element elem, ProcessingEnvironment env) {
+		//needed to actually turn elem into a TypeVariable, find it ignoring generics
+		elem = env.getElementUtils().getTypeElement(elem.asType().toString().split("<")[0]);
+		StringBuilder fqnBuilder = new StringBuilder();
+		while(elem.getEnclosingElement() != null && elem.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
+			fqnBuilder
+				.insert(0, elem.getSimpleName().toString())
+				.insert(0, "$");
+			elem = elem.getEnclosingElement();
+		}
+		return fqnBuilder.insert(0, elem.asType().toString()).toString();
+	}
+
+	/**
+	 * Gets the descriptor from an {@link Element}.
+	 * In particular, it will ensure to conver the internal class name to the
+	 * one used at compile time
+	 * @param elem the {@link Element} in question
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the descriptor
+	 * @since 0.5.1
+	 */
+	public static String descriptorFromElement(Element elem, ProcessingEnvironment env) {
+		if(elem instanceof ExecutableElement)
+			return descriptorFromExecutableElement((ExecutableElement) elem, env);
+
+		TypeMirror tk = elem.asType();
+		int arrayLevel = 0;
+		while(tk.getKind() == TypeKind.ARRAY) {
+			tk = ((ArrayType) tk).getComponentType();
+			arrayLevel++;
+		}
+
+		if(tk.getKind() != TypeKind.DECLARED)
+			return descriptorFromType(elem.asType(), env);
+
+		return DescriptorBuilder.nameToDescriptor(internalNameFromElement(elem, env), arrayLevel);
+	}
+
+	/**
+	 * Builds a type descriptor from the given {@link TypeMirror}.
+	 * @param t the {@link TypeMirror} representing the desired type
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return a {@link String} containing the relevant descriptor
+	 */
+	public static String descriptorFromType(TypeMirror t, ProcessingEnvironment env) {
+		StringBuilder desc = new StringBuilder();
+		//add array brackets
+		while(t.getKind() == TypeKind.ARRAY) {
+			desc.append("[");
+			t = ((ArrayType) t).getComponentType();
+		}
+
+		if(t.getKind() == TypeKind.TYPEVAR)
+			t = ((TypeVariable) t).getUpperBound();
+
+		if(t.getKind() == TypeKind.DECLARED)
+			return descriptorFromElement(env.getTypeUtils().asElement(t), env);
+
+
+		switch(t.getKind()) {
+			case BOOLEAN:
+				desc.append("Z");
+				break;
+			case CHAR:
+				desc.append("C");
+				break;
+			case BYTE:
+				desc.append("B");
+				break;
+			case SHORT:
+				desc.append("S");
+				break;
+			case INT:
+				desc.append("I");
+				break;
+			case FLOAT:
+				desc.append("F");
+				break;
+			case LONG:
+				desc.append("J");
+				break;
+			case DOUBLE:
+				desc.append("D");
+				break;
+			case VOID:
+				desc.append("V");
+				break;
+		}
+
+		return desc.toString();
+	}
+
+	/**
+	 * Builds a method descriptor from the given {@link ExecutableElement}.
+	 * @param m the {@link ExecutableElement} for the method
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return a {@link String} containing the relevant descriptor
+	 */
+	public static String descriptorFromExecutableElement(ExecutableElement m, ProcessingEnvironment env) {
+		StringBuilder methodSignature = new StringBuilder();
+		methodSignature.append("(");
+		m.getParameters().forEach(p -> methodSignature.append(descriptorFromType(p.asType(), env)));
+		methodSignature.append(")");
+		methodSignature.append(descriptorFromType(m.getReturnType(), env));
+		return methodSignature.toString();
 	}
 
 	/**
@@ -156,12 +267,15 @@ public class ASTUtils {
 	 * @param descr the descriptor to search for, or null if it's not a method
 	 * @param strict whether to perform lookup in strict mode (see {@link Target#strict()} for more information)
 	 * @param field whether the member being searched is a field
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @return the desired member, if it exists
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static Element findMember(ClassContainer parent, String name, String descr, boolean strict, boolean field) {
+	public static Element findMember(
+		ClassContainer parent, String name, String descr,
+		boolean strict, boolean field, ProcessingEnvironment env) {
 		if(parent.elem == null)
 			throw new TargetNotFoundException("parent class", parent.fqn);
 		//try to find by name
@@ -185,14 +299,14 @@ public class ASTUtils {
 			if(field) {
 				//fields can verify the signature for extra safety
 				//but there can only be 1 field with a given name
-				if(!descriptorFromType(candidates.get(0).asType()).equals(descr))
+				if(!descriptorFromElement(candidates.get(0), env).equals(descr))
 					throw new TargetNotFoundException("field", String.format("%s with descriptor %s", name, descr), parent.fqn);
 			} else {
 				candidates = candidates.stream()
 					.map(e -> (ExecutableElement) e)
 					.filter(strict
-						? c -> descr.equals(descriptorFromExecutableElement(c))
-						: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c).split("\\)")[0])
+						? c -> descr.equals(descriptorFromExecutableElement(c, env))
+						: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c, env).split("\\)")[0])
 					).collect(Collectors.toList());
 			}
 			if(candidates.size() == 0)

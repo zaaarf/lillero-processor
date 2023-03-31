@@ -12,8 +12,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromType;
+import static ftbsc.lll.processor.tools.ASTUtils.descriptorFromType;
 
 /**
  * Container for information about a field.
@@ -45,8 +44,6 @@ public class FieldContainer {
 
 	/**
 	 * The {@link ClassContainer} representing the parent of this field.
-	 * May be null if the parent is a class type that can not be checked
-	 * at processing time (such as an anonymous class)
 	 */
 	public final ClassContainer parent;
 
@@ -62,9 +59,12 @@ public class FieldContainer {
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target field
 	 * @param descriptor the descriptor of the target field, may be null for verifiable fields
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
-	public FieldContainer(ClassContainer parent, String name, String descriptor, ObfuscationMapper mapper) {
+	public FieldContainer(
+		ClassContainer parent, String name, String descriptor,
+		ProcessingEnvironment env, ObfuscationMapper mapper) {
 		this.parent = parent;
 		if(parent.elem == null) { //unverified
 			if(descriptor == null)
@@ -72,13 +72,12 @@ public class FieldContainer {
 			this.elem = null;
 			this.name = name;
 			this.descriptor = descriptor;
-			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
 		} else {
-			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true);
+			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, env);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromType(this.elem.asType());
-			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
+			this.descriptor = descriptorFromElement(this.elem, env);
 		}
+		this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
 		this.nameObf = findMemberName(parent.fqnObf, this.name, null, mapper);
 	}
 
@@ -104,20 +103,17 @@ public class FieldContainer {
 		String name = f.name().equals("") ? finder.getSimpleName().toString() : f.name();
 		String descriptor;
 		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, env);
-		if(fieldType.toString().equals("java.lang.Object"))
+		if(fieldType.toString().equals("java.lang.Object")) {
 			descriptor = null;
-		else {
-			if(fieldType.getKind() == TypeKind.DECLARED)
+		} else {
+			if(fieldType.getKind() != TypeKind.VOID && !fieldType.getKind().isPrimitive())
 				descriptor = //jank af but this is temporary anyway
-					"L" + new ClassContainer(
-						fieldType.toString(),
-						f.typeInner().equals("") ? null : f.typeInner().split("//$"),
-						env,
-						mapper
-					).fqn.replace('.', '/') + ";";
-			else descriptor = descriptorFromType(fieldType);
+					"L" + ClassContainer.from(
+						f, Find::type, f.typeInner(), env, mapper
+					).fqnObf.replace('.', '/') + ";";
+			else descriptor = descriptorFromType(fieldType, env);
 		}
 
-		return new FieldContainer(parent, name, descriptor, mapper);
+		return new FieldContainer(parent, name, descriptor, env, mapper);
 	}
 }

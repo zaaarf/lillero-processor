@@ -39,6 +39,7 @@ public class ObfuscationMapper {
 	public ObfuscationMapper(Stream<String> str) {
 		AtomicReference<String> currentClass = new AtomicReference<>("");
 		str.forEach(l -> {
+			if(l == null) return;
 			if(l.startsWith("\t"))
 				mapper.get(currentClass.get()).addMember(l);
 			else {
@@ -61,18 +62,6 @@ public class ObfuscationMapper {
 		if(data == null)
 			throw new MappingNotFoundException(name);
 		else return data.obf;
-	}
-
-	/**
-	 * Gets the unobfuscated name of the class.
-	 * Due to how it's implemented, it's considerably less efficient than its
-	 * opposite operation.
-	 * @param obfName the obfuscated internal name of the desired class
-	 * @return the deobfuscated name of the class
-	 */
-	public String deobfuscateClass(String obfName) {
-		ObfuscationData data = getObfuscationData(obfName);
-		return data.unobf;
 	}
 
 	/**
@@ -139,35 +128,6 @@ public class ObfuscationMapper {
 		} catch(MappingNotFoundException e) {
 			return type;
 		}
-	}
-
-	/**
-	 * Gets the unobfuscated name of the given member.
-	 * Due to how it's implemented, it's considerably less efficient than its
-	 * opposite operation.
-	 * @param parentObf the obfuscated internal name of the container class
-	 * @param memberObf the field name or method signature
-	 * @return the deobfuscated name of the given member
-	 */
-	public String deobfuscateMember(String parentObf, String memberObf) {
-		ObfuscationData data = getObfuscationData(parentObf);
-		for(String unobf : data.members.keySet())
-			if(data.members.get(unobf).equals(memberObf))
-				return unobf;
-		return null;
-	}
-
-	/**
-	 * Used internally. Gets the obfuscation data corresponding to the given obfuscated class name.
-	 * @param classObfuscatedName the internal name of the obfuscated class
-	 * @return the desired {@link ObfuscationData} object
-	 * @throws MappingNotFoundException if no {@link ObfuscationData} object is found
-	 */
-	private ObfuscationData getObfuscationData(String classObfuscatedName) {
-		for(ObfuscationData s : mapper.values())
-			if(s.obf.equals(classObfuscatedName))
-				return s;
-		throw new MappingNotFoundException(classObfuscatedName);
 	}
 
 	/**

@@ -40,7 +40,7 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  */
 @SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@SupportedOptions({"mappingsFile", "badPracticeWarnings", "anonymousClassWarning", "obfuscateInjectorMetadata"})
+@SupportedOptions({"mappingsFile", "anonymousClassWarning", "obfuscateInjectorMetadata"})
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -52,13 +52,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * The {@link ObfuscationMapper} used to convert classes and variables
 	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
-	private ObfuscationMapper mapper;
-
-	/**
-	 * Whether the processor should issue warnings when compiling code adopting
-	 * bad practices.
-	 */
-	public static boolean badPracticeWarnings = true;
+	private ObfuscationMapper mapper = null;
 
 	/**
 	 * Whether the processor should issue warnings when compiling code anonymous
@@ -108,9 +102,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
 				StandardCharsets.UTF_8)).lines());
 		}
-		String warns = processingEnv.getOptions().get("badPracticeWarnings");
-		if(warns != null)
-			badPracticeWarnings = parseBooleanArg(warns);
 		String anonymousClassWarn = processingEnv.getOptions().get("anonymousClassWarning");
 		if(anonymousClassWarn != null)
 			anonymousClassWarning = parseBooleanArg(anonymousClassWarn);
@@ -249,8 +240,15 @@ public class LilleroProcessor extends AbstractProcessor {
 					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
-			} else if(type == ProxyType.FIELD || type == ProxyType.METHOD)
-				appendMemberFinderDefinition(targetClass, proxyVar, null, null, constructorBuilder, this.processingEnv, this.mapper);
+			} else if(type == ProxyType.FIELD)
+				appendMemberFinderDefinition(
+					proxyVar,
+					null,
+					null,
+					constructorBuilder,
+					this.processingEnv,
+					this.mapper
+				);
 		}
 
 		//this will contain the classes to generate: the key is the class name
@@ -316,7 +314,6 @@ public class LilleroProcessor extends AbstractProcessor {
 						VariableElement finder = finderCandidates.get(0);
 						matchedMethodFinders.add(finder);
 						appendMemberFinderDefinition(
-							targetClass,
 							finder,
 							tg,
 							targetAnn,

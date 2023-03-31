@@ -13,8 +13,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.function.Function;
 
-import static ftbsc.lll.processor.tools.ASTUtils.findClassName;
-import static ftbsc.lll.processor.tools.ASTUtils.getTypeFromAnnotation;
+import static ftbsc.lll.processor.tools.ASTUtils.*;
 
 /**
  * Container for information about a class.
@@ -49,14 +48,17 @@ public class ClassContainer {
 	 */
 	public ClassContainer(String fqn, String[] innerNames, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		//find and validate
-		Element elem = env.getElementUtils().getTypeElement(fqn); //use unobfuscated name
+		Element elem = env.getElementUtils().getTypeElement(fqn);
+
 		if(elem == null)
 			throw new TargetNotFoundException("class", fqn);
 
+		StringBuilder fqnBuilder = new StringBuilder(internalNameFromElement(elem, env));
+
 		if(innerNames != null) {
-			StringBuilder newFQN = new StringBuilder(fqn);
 			for(String inner : innerNames) {
-				newFQN.append("$").append(inner);
+				if(inner == null) continue;
+				fqnBuilder.append("$").append(inner);
 				try {
 					int anonClassCounter = Integer.parseInt(inner);
 					//anonymous classes cannot be validated!
@@ -65,7 +67,7 @@ public class ClassContainer {
 							Diagnostic.Kind.WARNING,
 							String.format(
 								"Anonymous classes cannot be verified by the processor. The existence of %s$%s is not guaranteed!",
-								fqn, anonClassCounter
+								fqnBuilder, anonClassCounter
 							)
 						);
 					elem = null;
@@ -82,8 +84,9 @@ public class ClassContainer {
 				if(elem == null)
 					throw new TargetNotFoundException("class", inner);
 			}
-			this.fqn = newFQN.toString();
-		} else this.fqn = fqn;
+		}
+
+		this.fqn = fqnBuilder.toString();
 		this.fqnObf = findClassName(this.fqn, mapper);
 		this.elem = elem;
 	}

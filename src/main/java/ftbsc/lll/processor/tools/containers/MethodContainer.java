@@ -2,7 +2,6 @@ package ftbsc.lll.processor.tools.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
-import ftbsc.lll.processor.LilleroProcessor;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
@@ -10,11 +9,8 @@ import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
-import javax.tools.Diagnostic;
 
-import static ftbsc.lll.processor.tools.ASTUtils.findMember;
-import static ftbsc.lll.processor.tools.ASTUtils.findMemberName;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.descriptorFromExecutableElement;
+import static ftbsc.lll.processor.tools.ASTUtils.*;
 
 /**
  * Container for information about a method.
@@ -46,8 +42,6 @@ public class MethodContainer {
 
 	/**
 	 * The {@link ClassContainer} representing the parent of this method.
-	 * May be null if the parent is a class type that can not be checked
-	 * at processing time (such as an anonymous class)
 	 */
 	public final ClassContainer parent;
 
@@ -64,9 +58,12 @@ public class MethodContainer {
 	 * @param name the fully-qualified name of the target method
 	 * @param descriptor the descriptor of the target method
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info).
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
-	public MethodContainer(ClassContainer parent, String name, String descriptor, boolean strict, ObfuscationMapper mapper) {
+	public MethodContainer(
+		ClassContainer parent, String name, String descriptor,
+		boolean strict, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		this.parent = parent;
 		if(parent.elem == null) { //unverified
 			if(descriptor == null)
@@ -74,13 +71,12 @@ public class MethodContainer {
 			this.elem = null;
 			this.name = name;
 			this.descriptor = descriptor;
-			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
 		} else {
-			this.elem = (ExecutableElement) findMember(parent, name, descriptor, descriptor != null && strict, false);
+			this.elem = (ExecutableElement) findMember(parent, name, descriptor, descriptor != null && strict, false, env);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromExecutableElement(this.elem);
-			this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
+			this.descriptor = descriptorFromExecutableElement(this.elem, env);
 		}
+		this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
 		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, mapper);
 	}
 
@@ -104,20 +100,13 @@ public class MethodContainer {
 			f, env, mapper
 		);
 
-		String name, descriptor;
-		if(f != null && !f.name().equals("")) { //match by name alone
-			if(LilleroProcessor.badPracticeWarnings) //warn user that he is doing bad stuff
-				env.getMessager().printMessage(Diagnostic.Kind.WARNING,
-					String.format("Matching method %s by name, this is bad practice and may lead to unexpected behaviour. Use @Target stubs instead!", f.name()));
-			name = f.name();
-			descriptor = null;
-		} else {
-			if(t != null && !t.methodName().equals(""))
-				name = t.methodName(); //name was specified in target
-			else name = stub.getSimpleName().toString();
-			descriptor = t != null && t.strict() ? descriptorFromExecutableElement(stub) : null;
-		}
+		String name = t != null && !t.methodName().equals("")
+			?	t.methodName() //name was specified in target
+			: stub.getSimpleName().toString();
+		String descriptor = t != null && t.strict()
+			? descriptorFromExecutableElement(stub, env)
+			: null;
 
-		return new MethodContainer(parent, name, descriptor, t != null && t.strict(), mapper);
+		return new MethodContainer(parent, name, descriptor, t != null && t.strict(), env, mapper);
 	}
 }
