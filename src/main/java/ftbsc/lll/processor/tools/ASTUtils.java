@@ -130,7 +130,7 @@ public class ASTUtils {
 				.insert(0, "$");
 			elem = elem.getEnclosingElement();
 		}
-		return fqnBuilder.insert(0, elem.asType().toString()).toString();
+		return fqnBuilder.insert(0, elem.asType().toString().split("<")[0]).toString();
 	}
 
 	/**
