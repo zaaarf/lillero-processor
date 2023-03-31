@@ -1,29 +1,29 @@
 plugins {
-    id 'java'
-    id 'com.palantir.git-version' version '0.13.0'
+	id 'java'
+	id 'com.palantir.git-version' version '0.13.0'
 }
 
 archivesBaseName = 'processor'
 version = gitVersion()
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
-    withSourcesJar()
-    withJavadocJar()
+	sourceCompatibility = JavaVersion.VERSION_1_8
+	targetCompatibility = JavaVersion.VERSION_1_8
+	withSourcesJar()
+	withJavadocJar()
 }
 
 repositories {
-    mavenCentral()
-    maven { url = 'https://maven.fantabos.co' }
+	mavenCentral()
+	maven { url = 'https://maven.fantabos.co' }
 }
 
 dependencies {
-    implementation 'com.squareup:javapoet:1.13.0'
-    implementation 'org.ow2.asm:asm-commons:9.5'
-    implementation 'ftbsc:lll:0.4.0'
+	implementation 'com.squareup:javapoet:1.13.0'
+	implementation 'org.ow2.asm:asm-commons:9.5'
+	implementation 'ftbsc:lll:0.4.0'
 }
 
 jar {
-    archiveFileName = "${jar.archiveBaseName.get()}-${project.version.split('-')[0]}.${jar.archiveExtension.get()}"
+	archiveFileName = "${jar.archiveBaseName.get()}-${project.version.split('-')[0]}.${jar.archiveExtension.get()}"
 }
