@@ -64,7 +64,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Whether injector metadata (what is returned by the functions of {@link IInjector})
 	 * is to use obfuscated names instead of its normal names.
 	 */
-	public static boolean obfuscateInjectorMetadata = false;
+	public static boolean obfuscateInjectorMetadata = true;
 
 	/**
 	 * Initializes the processor with the processing environment by
