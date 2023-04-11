@@ -15,6 +15,7 @@ import javax.lang.model.type.*;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -122,7 +123,7 @@ public class ASTUtils {
 	 */
 	public static String internalNameFromType(TypeMirror type, ProcessingEnvironment env) {
 		//needed to actually turn elem into a TypeVariable, find it ignoring generics
-		Element elem = env.getElementUtils().getTypeElement(type.toString().split("<")[0]);
+		Element elem = env.getTypeUtils().asElement(env.getTypeUtils().erasure(type));
 		StringBuilder fqnBuilder = new StringBuilder();
 		while(elem.getEnclosingElement() != null && elem.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
 			fqnBuilder
@@ -131,7 +132,7 @@ public class ASTUtils {
 			elem = elem.getEnclosingElement();
 		}
 		return fqnBuilder
-			.insert(0, elem.asType().toString().split("<")[0])
+			.insert(0, env.getTypeUtils().erasure(elem.asType()).toString())
 			.toString()
 			.replace('.', '/');
 	}
@@ -143,6 +144,8 @@ public class ASTUtils {
 	 * @return a {@link String} containing the relevant descriptor
 	 */
 	public static String descriptorFromType(TypeMirror t, ProcessingEnvironment env) {
+		t = env.getTypeUtils().erasure(t); //type erasure
+
 		StringBuilder desc = new StringBuilder();
 		//add array brackets
 		while(t.getKind() == TypeKind.ARRAY) {
