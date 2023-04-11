@@ -78,7 +78,7 @@ public class MethodContainer {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, descriptor != null && strict,false, env
 			);
-			this.elem = bridge ? findOverloadedMethod((TypeElement) this.parent.elem, tmp, env) : tmp;
+			this.elem = bridge ? findSyntheticBridge((TypeElement) this.parent.elem, tmp, env) : tmp;
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromExecutableElement(this.elem, env);
 		}
