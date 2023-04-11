@@ -59,13 +59,14 @@ public class MethodContainer {
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target method
 	 * @param descriptor the descriptor of the target method
-	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info).
+	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
+	 * @param bridge whether the "bridge" should be matched isntead (see {@link Target#bridge()} for more info)
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
 	private MethodContainer(
-		ClassContainer parent, String name, String descriptor,
-		boolean strict, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		ClassContainer parent, String name, String descriptor, boolean strict,
+		boolean bridge, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		this.parent = parent;
 		if(parent.elem == null) { //unverified
 			if(descriptor == null)
@@ -74,13 +75,10 @@ public class MethodContainer {
 			this.name = name;
 			this.descriptor = descriptor;
 		} else {
-			this.elem = findOverloadedMethod( //to prevent type erasure from messing it all up
-				(TypeElement) this.parent.elem,
-				(ExecutableElement) findMember(
-					parent, name, descriptor, descriptor != null && strict,false, env
-				), env
+			ExecutableElement tmp = (ExecutableElement) findMember(
+				parent, name, descriptor, descriptor != null && strict,false, env
 			);
-
+			this.elem = bridge ? findOverloadedMethod((TypeElement) this.parent.elem, tmp, env) : tmp;
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromExecutableElement(this.elem, env);
 		}
@@ -108,13 +106,13 @@ public class MethodContainer {
 			f, env, mapper
 		);
 
-		String name = t != null && !t.methodName().equals("")
+		String name = !t.methodName().equals("")
 			?	t.methodName() //name was specified in target
 			: stub.getSimpleName().toString();
-		String descriptor = t != null && t.strict()
+		String descriptor = t.strict()
 			? descriptorFromExecutableElement(stub, env)
 			: null;
 
-		return new MethodContainer(parent, name, descriptor, t != null && t.strict(), env, mapper);
+		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), env, mapper);
 	}
 }
