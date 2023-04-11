@@ -258,9 +258,9 @@ public class LilleroProcessor extends AbstractProcessor {
 		HashSet<ExecutableElement> matchedInjectors = new HashSet<>();
 		HashSet<VariableElement> matchedMethodFinders = new HashSet<>();
 
+		int iterationNumber = 1;
 		for(ExecutableElement tg : targets) {
 			Target[] mtgAnn = tg.getAnnotationsByType(Target.class);
-			int iterationNumber = 1;
 			for(Target targetAnn : mtgAnn) {
 				List<ExecutableElement> injectorCandidates = injectors;
 				List<VariableElement> finderCandidates = methodFinders;
