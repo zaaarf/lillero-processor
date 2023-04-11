@@ -12,10 +12,8 @@ import ftbsc.lll.proxies.ProxyType;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
-import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -300,6 +298,36 @@ public class ASTUtils {
 				);
 			return candidates.get(0);
 		}
+	}
+
+	/**
+	 * Tries to find the method being overloaded by the given {@link ExecutableElement}.
+	 * In case of multiple layers of overloading, it finds the original one. In case of
+	 * no overloading, it returns the given method.
+	 * @param context the {@link TypeElement} representing the parent class
+	 * @param method an {@link ExecutableElement} representing the overloading method
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the original overloaded method, or the given method if it was not found
+	 * @since 0.5.2
+	 */
+	public static ExecutableElement findOverloadedMethod(
+		TypeElement context, ExecutableElement method, ProcessingEnvironment env) {
+		if (context.getSuperclass().getKind() == TypeKind.NONE)
+			return method;
+
+		for (Element elem : context.getEnclosedElements()) {
+			if (elem.getKind() != ElementKind.METHOD)
+				continue;
+			if (env.getElementUtils().overrides(method, (ExecutableElement) elem, context)) {
+				method = (ExecutableElement) elem;
+				break; //found
+			}
+		}
+
+		return findOverloadedMethod(
+			(TypeElement) env.getTypeUtils().asElement(context.getSuperclass()),
+			method, env
+		);
 	}
 
 	/**

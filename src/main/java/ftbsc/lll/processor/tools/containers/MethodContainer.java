@@ -9,6 +9,7 @@ import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
 
@@ -72,7 +73,13 @@ public class MethodContainer {
 			this.name = name;
 			this.descriptor = descriptor;
 		} else {
-			this.elem = (ExecutableElement) findMember(parent, name, descriptor, descriptor != null && strict, false, env);
+			this.elem = findOverloadedMethod( //to prevent type erasure from messing it all up
+				(TypeElement) this.parent.elem,
+				(ExecutableElement) findMember(
+					parent, name, descriptor, descriptor != null && strict,false, env
+				), env
+			);
+
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromExecutableElement(this.elem, env);
 		}
