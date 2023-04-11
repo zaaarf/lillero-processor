@@ -75,7 +75,7 @@ public class FieldContainer {
 		} else {
 			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, env);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromElement(this.elem, env);
+			this.descriptor = descriptorFromType(this.elem.asType(), env);
 		}
 		this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
 		this.nameObf = findMemberName(parent.fqn, this.name, null, mapper);

@@ -53,7 +53,9 @@ public class ClassContainer {
 		if(elem == null)
 			throw new TargetNotFoundException("class", fqn);
 
-		StringBuilder fqnBuilder = new StringBuilder(internalNameFromElement(elem, env));
+		StringBuilder fqnBuilder = new StringBuilder(
+			internalNameFromType(elem.asType(), env).replace('/', '.')
+		);
 
 		if(innerNames != null) {
 			for(String inner : innerNames) {
