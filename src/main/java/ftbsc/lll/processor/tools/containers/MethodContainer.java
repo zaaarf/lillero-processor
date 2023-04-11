@@ -54,7 +54,8 @@ public class MethodContainer {
 	public final ExecutableElement elem;
 
 	/**
-	 * Public constructor.
+	 * Private constructor, called from
+	 * {@link #from(ExecutableElement, Target, Find, ProcessingEnvironment, ObfuscationMapper)}.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target method
 	 * @param descriptor the descriptor of the target method
@@ -62,7 +63,7 @@ public class MethodContainer {
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
-	public MethodContainer(
+	private MethodContainer(
 		ClassContainer parent, String name, String descriptor,
 		boolean strict, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		this.parent = parent;

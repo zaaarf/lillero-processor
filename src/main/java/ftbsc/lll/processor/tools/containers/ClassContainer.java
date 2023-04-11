@@ -40,13 +40,13 @@ public class ClassContainer {
 	public final Element elem;
 
 	/**
-	 * Public constructor.
+	 * Private constructor, called from {@link #from(Annotation, Function, String, ProcessingEnvironment, ObfuscationMapper)}.
 	 * @param fqn the fully-qualified name of the target class
 	 * @param innerNames an array of Strings containing the path to the inner class, may be null
 	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
-	public ClassContainer(String fqn, String[] innerNames, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	private ClassContainer(String fqn, String[] innerNames, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		//find and validate
 		Element elem = env.getElementUtils().getTypeElement(fqn);
 

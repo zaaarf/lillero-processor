@@ -55,14 +55,14 @@ public class FieldContainer {
 	public final VariableElement elem;
 
 	/**
-	 * Public constructor.
+	 * Private constructor, called from {@link #from(VariableElement, ProcessingEnvironment, ObfuscationMapper)}.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target field
 	 * @param descriptor the descriptor of the target field, may be null for verifiable fields
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 */
-	public FieldContainer(
+	private FieldContainer(
 		ClassContainer parent, String name, String descriptor,
 		ProcessingEnvironment env, ObfuscationMapper mapper) {
 		this.parent = parent;
