@@ -5,10 +5,7 @@ import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.exceptions.OrphanElementException;
-import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.processor.annotations.Injector;
-import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.annotations.Target;
+import ftbsc.lll.processor.annotations.*;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.containers.MethodContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
@@ -38,7 +35,7 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  * The actual annotation processor behind the magic.
  * It (implicitly) implements the {@link Processor} interface by extending {@link AbstractProcessor}.
  */
-@SupportedAnnotationTypes("ftbsc.lll.processor.annotations.Patch")
+@SupportedAnnotationTypes({"ftbsc.lll.processor.annotations.Patch", "ftbsc.lll.processor.annotations.RegisterBareInjector"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @SupportedOptions({"mappingsFile", "anonymousClassWarning", "obfuscateInjectorMetadata"})
 public class LilleroProcessor extends AbstractProcessor {
@@ -144,15 +141,19 @@ public class LilleroProcessor extends AbstractProcessor {
 						.map(e -> (TypeElement) e)
 						.filter(this::isValidInjector)
 						.collect(Collectors.toSet());
-				if(!validInjectors.isEmpty()) {
+				if(!validInjectors.isEmpty())
 					validInjectors.forEach(this::generateClasses);
-					if (!this.generatedInjectors.isEmpty()) {
-						generateServiceProvider();
-						return true;
-					}
-				}
+			} else if(annotation.getQualifiedName().contentEquals(RegisterBareInjector.class.getName())) {
+				for(Element e : roundEnv.getElementsAnnotatedWith(annotation))
+					this.generatedInjectors.add(((TypeElement) e).getQualifiedName().toString());
 			}
 		}
+
+		if (!this.generatedInjectors.isEmpty()) {
+			generateServiceProvider();
+			return true;
+		}
+
 		return false;
 	}
 
