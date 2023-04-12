@@ -1,7 +1,7 @@
 # Lillero-processor
 Lillero-processor is an annotation processor made to simplify development of [Lillero](https://git.fantabos.co/lillero) patches, minimising the amount of boilerplate code needed.
 
-An important note: to make things as easy as it is, the processor assumes that you have the code of the target available in your development environment. As of 0.5.0, it will not work otherwise.
+An important note: to make things as easy as it is, the processor assumes that you have the code of the target available in your development environment. As of 0.6.0, it will not work otherwise.
 
 ## Usage
 First things first, add the processor to your `build.gradle`:
@@ -55,6 +55,8 @@ If for any reason you don't want to check the full signature, but rather attempt
 
 You may find yourself not wanting to use the actual name of the target method in the stub. Maybe you have a name conflict, or maybe you are just trying to patch a constructor (`<init>`) or a static constructor (`<clinit>`), whose names you cannot type. Simply add `methodName = "name"` to your `@Target` annotation, and the specified name will overrule the stub's name.
 
+It's interesting to note that the `ClassNode` in your injector method can be omitted if you don't use it (that is, most of them).
+
 ### Finders
 While patching, you may find yourself needing to refer to other methods and fields, both within your code and within the target. This can be simplified considerably through the `@Find` annotation. The behaviour of `@Find` differs considerably depending on what kind of element it is looking for. Let's see the three cases.
 
@@ -99,13 +101,13 @@ public void inject(ClassNode clazz, MethodNode main) {
 Obviously, it's up to you to use the correct opcode. The processor can't read your mind (yet).
 
 ### Private Inner Classes
-You may find yourself needing to interact with a private inner class - which you can't reference explicitly by `Name.class`. The processor has your back, once again. Every annotation which tries to match a class (i.e. `@Patch` and `@Find`) also provides a `className` parameter. `className` will behave differently depending on whether the `value` (the Class object you are passing it) is set. If it is not set, `className` will act as the fully-qualified name of your target (i.e. your.package.SampleClass$Inner). Otherwise, it will act as the "unaccassible part" of the name, to be appended with a `$` on front to what is extracted from the Class object.
+You may find yourself needing to interact with a private inner class - which you can't reference explicitly by `Name.class`. The processor has your back, once again. Every annotation which tries to match a class (i.e. `@Patch` and `@Find`) also provides a `innerName` parameter. This allows you to specify the "unaccessible part" of the name, to be appended with a `$` in front of what is extracted from the Class object. In the unfortunate case of multiple nesting with private classes, just place any extra `$` yourself (i.e. `SampleClass$PrivateInnerFirst$InnerSecond` should be reached with a `@Patch(value = SampleClass.class, innerName = "PrivateInnerFirst$InnerSecond"`).
 
 #### Anonymous classes
 Anonymous classes are trickier, because [they are apparently unavailable](https://stackoverflow.com/questions/75849759/how-to-find-an-anonymous-class-in-the-annotation-processing-environment) in the normal annotation processing environment. That means that, unlike with other classes, the processor cannot make sure that they exist, and it cannot easily extract information about their fields and methods.
 
-Anonymous classes are numbered by the compiler in the order it meets them, starting from 1. The following rules apply to patching an anonymous class with the processor, as of version 0.5.0:
-* Use the compiler-assigned number as `className` parameter, next to the parent class.
+Anonymous classes are numbered by the compiler in the order it meets them, starting from 1. The following rules apply to patching an anonymous class with the processor, as of version 0.6.0:
+* Use the compiler-assigned number as `innerName` parameter, next to the parent class.
 * Write any method stub normally.
 * Finders for anonymous class fields may be made, but their type has to be specified explicitly, unlike all others, by using the `type()` and `typeInner()` parameters.
 	- Local variables of the containing method may sometimes be accessible by an anonymous class. Make sure to use the `name` parameter of the finder appending the `val$` prefix, such as `val$actualName`.
@@ -114,7 +116,10 @@ The extra `@Find` parameters (`type()' and `typeInner()`) are meant to be tempor
 
 Most if not all of this (although I have not tested it) should apply to local classes as well.
 
-### Obfuscation
+### Hybrid setups
+Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to avoid conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
+
+### Obfuscation support
 You may pass a mappings file to the processor by adding this to your `build.gradle`:
 
 ```groovy
@@ -131,6 +136,6 @@ In the same way you pass mappings, you may pass `false` or `0` to the boolean ar
 ## Conclusions and Extras
 Since reaching version 0.5.0, the processor will hopefully be mostly stable. It has changed much in the past versions, but I am confident that we now found a solution capable of handling most, if not all, cases. 
 
-Though most of that code is gone, you can still read my dev diary about developing its first version [here](https://fantabos.co/posts/zaaarf/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
+Though most of the original code is gone, you can still read my dev diary about developing its first version [here](https://fantabos.co/posts/zaaarf/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
 
 In conclusion, let me just say: happy patching!
