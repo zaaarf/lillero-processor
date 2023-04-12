@@ -13,11 +13,7 @@ import ftbsc.lll.proxies.impl.FieldProxy;
 import ftbsc.lll.proxies.impl.MethodProxy;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.VariableElement;
-import java.util.Collection;
+import javax.lang.model.element.*;
 import java.util.HashSet;
 
 import static ftbsc.lll.processor.tools.ASTUtils.getProxyType;
@@ -102,7 +98,7 @@ public class JavaPoetUtils {
 		con.addStatement(
 			"$L.setModifiers($L)",
 			builderName,
-			target == null ? 0 :mapModifiers(target.getModifiers())
+			target == null ? 0 : mapModifiers(target.getModifiers())
 		);
 
 		//set type(s)
@@ -121,19 +117,26 @@ public class JavaPoetUtils {
 	}
 
 	/**
-	 * Generates a {@link HashSet} of dummy overrides given a {@link Collection} stubs.
- 	 * @param dummies the stubs
+	 * Generates a {@link HashSet} of dummy overrides for every abstract method in a given class,
+	 * represented as a {@link TypeElement}.
+ 	 * @param clazz the given class
 	 * @return a {@link HashSet} containing the generated {@link MethodSpec}s
 	 * @since 0.5.0
 	 */
-	public static HashSet<MethodSpec> generateDummies(Collection<ExecutableElement> dummies) {
+	public static HashSet<MethodSpec> generateDummies(TypeElement clazz) {
 		HashSet<MethodSpec> specs = new HashSet<>();
-		for(ExecutableElement d : dummies)
-			if(d.getModifiers().contains(Modifier.ABSTRACT))
-				specs.add(MethodSpec.overriding(d)
-					.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
-					.build()
-				);
+		clazz
+			.getEnclosedElements()
+			.stream()
+			.filter(e -> e instanceof ExecutableElement)
+			.map(e -> (ExecutableElement) e)
+			.forEach(e -> {
+				if(e.getModifiers().contains(Modifier.ABSTRACT))
+					specs.add(MethodSpec.overriding(e)
+						.addStatement("throw new $T($S)", RuntimeException.class, "This is a stub and should not have been called")
+						.build()
+					);
+			});
 		return specs;
 	}
 

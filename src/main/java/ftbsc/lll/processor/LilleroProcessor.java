@@ -346,7 +346,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(buildStringReturnMethod("targetClass", obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
 				.addMethod(buildStringReturnMethod("methodName", obfuscateInjectorMetadata ? target.nameObf : target.name))
 				.addMethod(buildStringReturnMethod("methodDesc", obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
-				.addMethods(generateDummies(targets))
+				.addMethods(generateDummies(cl))
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
 
