@@ -165,12 +165,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
 	private boolean isValidInjector(TypeElement elem) {
-		Patch p = elem.getAnnotation(Patch.class);
-		if(getTypeFromAnnotation(p, Patch::value, this.processingEnv).toString().equals("java.lang.Object") && p.className().equals("")) {
-			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-				String.format("Empty @Patch annotation on class %s, skipping.", elem));
-			return false;
-		}
 		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
 		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
 		if (elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
@@ -200,7 +194,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		ClassContainer targetClass = ClassContainer.from(
 			patchAnn,
 			Patch::value,
-			patchAnn.className(),
+			patchAnn.innerClass(),
 			this.processingEnv,
 			this.mapper
 		);

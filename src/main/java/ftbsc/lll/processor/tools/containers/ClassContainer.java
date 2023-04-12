@@ -87,7 +87,6 @@ public class ClassContainer {
 					throw new TargetNotFoundException("class", inner);
 			}
 		}
-
 		this.fqn = fqnBuilder.toString();
 		this.fqnObf = findClassName(this.fqn, mapper);
 		this.elem = elem;
@@ -106,19 +105,11 @@ public class ClassContainer {
 	 */
 	public static <T extends Annotation> ClassContainer from(
 		T ann, Function<T, Class<?>> classFunction, String className,
-		ProcessingEnvironment env, ObfuscationMapper mapper)
-	{
+		ProcessingEnvironment env, ObfuscationMapper mapper) {
 		String fqn;
 		String[] inner;
-		if(className.contains(".")) {
-			String[] split = className.split("//$");
-			fqn = split[0];
-			inner = split.length == 1 ? null : Arrays.copyOfRange(split, 1, split.length - 1);
-		} else {
-			fqn = getTypeFromAnnotation(ann, classFunction, env).toString();
-			inner = className.equals("") ? null : className.split("//$");
-		}
-
+		fqn = getTypeFromAnnotation(ann, classFunction, env).toString();
+		inner = className.equals("") ? null : className.split("//$");
 		return new ClassContainer(fqn, inner, env, mapper);
 	}
 

@@ -26,9 +26,9 @@ public @interface Find {
 	Class<?> value() default Object.class;
 
 	/**
-	 * This can be either the fully-qualified name to be used in place of {@link #value()} to
-	 * represent the parent class or an inner class name to append after a $ symbol to the
-	 * already acquired fully-qualified name.
+	 * This is the inner class name to append after a $ symbol to the already acquired
+	 * fully-qualified name. If it's a number instead of a valid name, the class will be
+	 * treated as an anonymous class, and will therefore be automatically unverified.
 	 * For a {@link TypeProxy}, this refers to the class itself rather than the parent.
 	 * @return the name of the inner class that contains the target,
 	 * defaults to empty string (not an inner class)
