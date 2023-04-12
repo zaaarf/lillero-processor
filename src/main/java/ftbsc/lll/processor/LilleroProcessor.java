@@ -134,7 +134,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-		for (TypeElement annotation : annotations) {
+		for(TypeElement annotation : annotations) {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				Set<TypeElement> validInjectors =
 					roundEnv.getElementsAnnotatedWith(annotation)
@@ -145,17 +145,21 @@ public class LilleroProcessor extends AbstractProcessor {
 				if(!validInjectors.isEmpty())
 					validInjectors.forEach(this::generateClasses);
 			} else if(annotation.getQualifiedName().contentEquals(RegisterBareInjector.class.getName())) {
-				for(Element e : roundEnv.getElementsAnnotatedWith(annotation))
-					this.generatedInjectors.add(((TypeElement) e).getQualifiedName().toString());
+				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
+				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
+					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType))
+						this.generatedInjectors.add(((TypeElement) e).getQualifiedName().toString());
+					else this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, String.format(
+						"Class %s annotated with @RegisterBareInjector is not an instance of IInjector, skipping...",
+						((TypeElement) e).getQualifiedName().toString()
+					));
+				}
 			}
 		}
-
 		if (!this.generatedInjectors.isEmpty()) {
 			generateServiceProvider();
 			return true;
-		}
-
-		return false;
+		} else return false;
 	}
 
 	/**
@@ -168,7 +172,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	private boolean isValidInjector(TypeElement elem) {
 		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
 		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
-		if (elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
+		if(elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
 			&& elem.getEnclosedElements().stream().filter(e -> e instanceof ExecutableElement).anyMatch(e -> {
 			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
 			return e.getAnnotation(Injector.class) != null
