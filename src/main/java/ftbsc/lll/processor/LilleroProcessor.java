@@ -7,6 +7,7 @@ import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.*;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
+import ftbsc.lll.processor.tools.containers.InjectorInfo;
 import ftbsc.lll.processor.tools.containers.MethodContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
@@ -172,9 +173,12 @@ public class LilleroProcessor extends AbstractProcessor {
 			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
 			return e.getAnnotation(Injector.class) != null
 				&& e.getAnnotation(Target.class) == null
-				&& params.size() == 2
-				&& this.processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
-				&& this.processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType);
+				&& (
+					(params.size() == 2
+						&& this.processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
+						&& this.processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType)
+					) || (params.size() == 1 && this.processingEnv.getTypeUtils().isSameType(params.get(0), methodNodeType))
+			);
 		})) return true;
 		else {
 			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
@@ -301,7 +305,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injector, tg, targetAnn)
+							new InjectorInfo(injector, tg, targetAnn, this.processingEnv, this.mapper)
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
@@ -331,21 +335,6 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		//iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
-			MethodSpec inject = MethodSpec.methodBuilder("inject")
-				.addModifiers(Modifier.PUBLIC)
-				.returns(void.class)
-				.addAnnotation(Override.class)
-				.addParameter(ParameterSpec.builder(
-					TypeName.get(processingEnv
-						.getElementUtils()
-						.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz").build())
-				.addParameter(ParameterSpec.builder(
-					TypeName.get(processingEnv
-						.getElementUtils()
-						.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main").build())
-				.addStatement(String.format("super.%s(clazz, main)", toGenerate.get(injName).injector.getSimpleName()), TypeName.get(cl.asType()))
-				.build();
-
 			MethodContainer target = toGenerate.get(injName).target;
 			TypeSpec injectorClass = TypeSpec.classBuilder(injName)
 				.addModifiers(Modifier.PUBLIC)
@@ -358,7 +347,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(buildStringReturnMethod("methodName", obfuscateInjectorMetadata ? target.nameObf : target.name))
 				.addMethod(buildStringReturnMethod("methodDesc", obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
 				.addMethods(generateDummies(targets))
-				.addMethod(inject)
+				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
 
 			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
@@ -391,45 +380,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			out.close();
 		} catch(IOException e) {
 			throw new RuntimeException(e);
-		}
-	}
-
-	/**
-	 * Container for information about a class that is to be generated.
-	 * Only used internally.
-	 */
-	private class InjectorInfo {
-		/**
-		 * The {@link ExecutableElement} corresponding to the injector method.
-		 */
-		public final ExecutableElement injector;
-
-		/**
-		 * The {@link ExecutableElement} corresponding to the target method stub.
-		 */
-		public final ExecutableElement targetStub;
-
-		/**
-		 * The reason for the injection.
-		 */
-		public final String reason;
-
-		/**
-		 * The {@link MethodContainer} corresponding to the target method.
-		 */
-		private final MethodContainer target;
-
-		/**
-		 * Public constructor.
-		 * @param injector the injector {@link ExecutableElement}
-		 * @param targetStub the target {@link ExecutableElement}
-		 * @param targetAnn the relevant {@link Target} annotation
-		 */
-		public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub, Target targetAnn) {
-			this.injector = injector;
-			this.targetStub = targetStub;
-			this.reason = injector.getAnnotation(Injector.class).reason();
-			this.target = MethodContainer.from(targetStub, targetAnn, null, processingEnv, mapper);
 		}
 	}
 }

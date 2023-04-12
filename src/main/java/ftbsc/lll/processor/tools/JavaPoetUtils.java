@@ -5,6 +5,7 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.containers.FieldContainer;
+import ftbsc.lll.processor.tools.containers.InjectorInfo;
 import ftbsc.lll.processor.tools.containers.MethodContainer;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
@@ -122,7 +123,7 @@ public class JavaPoetUtils {
 	/**
 	 * Generates a {@link HashSet} of dummy overrides given a {@link Collection} stubs.
  	 * @param dummies the stubs
-	 * @return the generated {@link HashSet}
+	 * @return a {@link HashSet} containing the generated {@link MethodSpec}s
 	 * @since 0.5.0
 	 */
 	public static HashSet<MethodSpec> generateDummies(Collection<ExecutableElement> dummies) {
@@ -134,5 +135,42 @@ public class JavaPoetUtils {
 					.build()
 				);
 		return specs;
+	}
+
+	/**
+	 * Generates the wrapper around a certain injector.
+	 * @param inj the {@link InjectorInfo} carrying the information about the target injector
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return the generated {@link MethodSpec} for the injector
+	 * @since 0.6.0
+	 */
+	public static MethodSpec generateInjector(InjectorInfo inj, ProcessingEnvironment env) {
+		MethodSpec.Builder injectBuilder = MethodSpec.methodBuilder("inject")
+			.addModifiers(Modifier.PUBLIC)
+			.returns(void.class)
+			.addAnnotation(Override.class);
+
+		int argumentCount = inj.injector.getParameters().size();
+
+		if(argumentCount == 2) {
+			injectBuilder
+				.addParameter(ParameterSpec.builder(
+						TypeName.get(env
+							.getElementUtils()
+							.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz")
+					.build());
+		}
+
+		injectBuilder
+			.addParameter(ParameterSpec.builder(
+				TypeName.get(env
+					.getElementUtils()
+					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main")
+				.build());
+
+		if(argumentCount == 2) injectBuilder.addStatement("super.$L(clazz, main)", inj.injector.getSimpleName());
+		else injectBuilder.addStatement("super.$L(main)", inj.injector.getSimpleName());
+
+		return injectBuilder.build();
 	}
 }
