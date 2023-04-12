@@ -102,10 +102,9 @@ public class MethodContainer {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from(patchAnn, Patch::value, patchAnn.innerClass(), env, mapper),
+			ClassContainer.from((TypeElement) stub.getEnclosingElement(), env, mapper),
 			f, env, mapper
 		);
-
 		String name = !t.methodName().equals("")
 			?	t.methodName() //name was specified in target
 			: stub.getSimpleName().toString();

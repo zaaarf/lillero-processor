@@ -95,21 +95,34 @@ public class ClassContainer {
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param classFunction the annotation function returning the class
-	 * @param className a string containing the FQN, the inner class name or nothing
+	 * @param innerName a string containing the inner class name or nothing
 	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
 	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
 	 * @param <T> the type of the annotation carrying the information
 	 * @return the fully qualified name of the given class
 	 * @since 0.5.0
 	 */
-	public static <T extends Annotation> ClassContainer from(
-		T ann, Function<T, Class<?>> classFunction, String className,
+	public static <T extends Annotation> ClassContainer from(T ann, Function<T, Class<?>> classFunction, String innerName,
 		ProcessingEnvironment env, ObfuscationMapper mapper) {
 		String fqn;
 		String[] inner;
 		fqn = getTypeFromAnnotation(ann, classFunction, env).toString();
-		inner = className.equals("") ? null : className.split("//$");
+		inner = innerName.equals("") ? null : innerName.split("//$");
 		return new ClassContainer(fqn, inner, env, mapper);
+	}
+
+	/**
+	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
+	 * @param cl the {@link TypeElement} representing the class
+	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
+	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param <T> the type of the annotation carrying the information
+	 * @return the fully qualified name of the given class
+	 * @since 0.6.0
+	 */
+	public static <T extends Annotation> ClassContainer from(
+		TypeElement cl, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		return new ClassContainer(cl.getQualifiedName().toString(), null, env, mapper);
 	}
 
 	/**

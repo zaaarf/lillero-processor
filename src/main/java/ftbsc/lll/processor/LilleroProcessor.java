@@ -234,7 +234,12 @@ public class LilleroProcessor extends AbstractProcessor {
 			//case-specific handling
 			if(type == ProxyType.TYPE) {
 				//find and validate
-				ClassContainer clazz = ClassContainer.findOrFallback(targetClass, proxyVar.getAnnotation(Find.class), this.processingEnv, this.mapper);
+				ClassContainer clazz = ClassContainer.findOrFallback(
+					ClassContainer.from(cl, this.processingEnv, this.mapper),
+					proxyVar.getAnnotation(Find.class),
+					this.processingEnv,
+					this.mapper
+				);
 				//types can be generated with a single instruction
 				constructorBuilder.addStatement(
 					"super.$L = $T.from($S, 0, $L)",

@@ -19,8 +19,8 @@ import java.lang.annotation.RetentionPolicy;
 public @interface Find {
 	/**
 	 * @return the {@link Class} object containing the target, or the
-	 * {@link Object} class if not specified (the {@link Class} from
-	 * {@link Patch#value()} is instead used).
+	 * {@link Object} class if not specified (the annotation's parent
+	 * class is instead used).
 	 * @since 0.5.0
 	 */
 	Class<?> value() default Object.class;

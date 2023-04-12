@@ -7,6 +7,7 @@ import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import org.objectweb.asm.Type;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -96,7 +97,7 @@ public class FieldContainer {
 		Find f = finder.getAnnotation(Find.class);
 
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from(patchAnn, Patch::value, patchAnn.innerClass(), env, mapper),
+			ClassContainer.from((TypeElement) finder.getEnclosingElement(), env, mapper),
 			f, env, mapper
 		);
 
