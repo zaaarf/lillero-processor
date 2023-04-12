@@ -10,7 +10,6 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
 import java.util.function.Function;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
@@ -125,7 +124,7 @@ public class ClassContainer {
 	 */
 	public static ClassContainer findOrFallback(ClassContainer fallback, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
 		if(f == null) return fallback;
-		ClassContainer cl = ClassContainer.from(f, Find::value, f.className(), env, mapper);
+		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), env, mapper);
 		return cl.fqn.equals("java.lang.Object")
 			? fallback
 			: cl;

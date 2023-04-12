@@ -34,7 +34,7 @@ public @interface Find {
 	 * defaults to empty string (not an inner class)
 	 * @since 0.5.0
 	 */
-	String className() default "";
+	String innerName() default "";
 
 	/**
 	 * For a {@link FieldProxy}, this is the name of the field to find. If omitted,
