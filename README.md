@@ -65,7 +65,7 @@ While patching, you may find yourself needing to refer to other methods and fiel
 FieldProxy fieldName;
 ```
 
-This is the simplest case. This finder will match any field named `fieldName` within the class `SomeClass`. If the class is unspecified, the one contained within `@Patch` is used instead. You may overrule the field name by adding `name = "actualName"` to your `@Find` annotation.
+This is the simplest case. This finder will match any field named `fieldName` within the class `SomeClass`.
 
 ```java
 @Find(SomeClass.class)
@@ -82,7 +82,9 @@ MethodProxy methodProxy;
 abstract void someMethod(int i, int j);
 ```
 
-MethodProxies need a stub to correctly match their target. Matching by name is also supported - either by setting the `strict` flag of the `@Target` annotation or by setting the `name` parameter in the `@Find` annotation - but is not recommended. The class specified within `@Find`, much like with fields, will be considered the parent class of the method you are looking for. If omitted, it defaults to the one specified in @Patch.
+MethodProxies need a stub to correctly match their target. Matching by name is also supported - either by setting the `strict` flag of the `@Target` annotation or by setting the `name` parameter in the `@Find` annotation - but is not recommended. The class specified within `@Find`, much like with fields, will be considered the parent class of the method you are looking for.
+
+Whenever the class is unspecified in a finder (except in TypeProxy's case, which is an error) it will be assumed to be the class containing the `@Find` annotation - that is, the patch class.
 
 Lillero provides three classes to use these in your injectors: `FieldProxyInsnNode`, `MethodProxyInsnNode` and `TypeProxyInsnNode`. Each wraps the equivalent [ObjectWeb ASM](https://asm.ow2.io/) `InsnNode`. For instance:
 
