@@ -202,7 +202,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		ClassContainer targetClass = ClassContainer.from(
 			patchAnn,
 			Patch::value,
-			patchAnn.innerClass(),
+			patchAnn.innerName(),
 			this.processingEnv,
 			this.mapper
 		);
@@ -236,6 +236,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				//find and validate
 				ClassContainer clazz = ClassContainer.findOrFallback(
 					ClassContainer.from(cl, this.processingEnv, this.mapper),
+					patchAnn,
 					proxyVar.getAnnotation(Find.class),
 					this.processingEnv,
 					this.mapper

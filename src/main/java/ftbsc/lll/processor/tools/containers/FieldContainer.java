@@ -98,7 +98,7 @@ public class FieldContainer {
 
 		ClassContainer parent = ClassContainer.findOrFallback(
 			ClassContainer.from((TypeElement) finder.getEnclosingElement(), env, mapper),
-			f, env, mapper
+			patchAnn, f, env, mapper
 		);
 
 		String name = f.name().equals("") ? finder.getSimpleName().toString() : f.name();

@@ -3,6 +3,7 @@ package ftbsc.lll.processor.tools.containers;
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.LilleroProcessor;
 import ftbsc.lll.processor.annotations.Find;
+import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -127,16 +128,17 @@ public class ClassContainer {
 
 	/**
 	 * Finds and builds a {@link ClassContainer} based on information contained
-	 * within a {@link Find} annotation, else returns a fallback.
+	 * within {@link Patch} or a {@link Find} annotations, else returns a fallback.
 	 * @param fallback the {@link ClassContainer} it falls back on
+	 * @param p the {@link Patch} annotation to get info from
 	 * @param f the {@link Find} annotation to get info from
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @param mapper the {@link ObfuscationMapper} to use, may be null
 	 * @return the built {@link ClassContainer} or the fallback if not enough information was present
 	 * @since 0.5.0
 	 */
-	public static ClassContainer findOrFallback(ClassContainer fallback, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
-		if(f == null) return fallback;
+	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		if(f == null) return ClassContainer.from(p, Patch::value, p.innerName(), env, mapper);
 		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), env, mapper);
 		return cl.fqn.equals("java.lang.Object")
 			? fallback

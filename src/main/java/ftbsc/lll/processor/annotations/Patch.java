@@ -27,5 +27,5 @@ public @interface Patch {
 	 * defaults to empty string (not an inner class)
 	 * @since 0.5.0
 	 */
-	String innerClass() default "";
+	String innerName() default "";
 }

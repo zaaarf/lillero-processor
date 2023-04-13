@@ -103,7 +103,7 @@ public class MethodContainer {
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		ClassContainer parent = ClassContainer.findOrFallback(
 			ClassContainer.from((TypeElement) stub.getEnclosingElement(), env, mapper),
-			f, env, mapper
+			patchAnn, f, env, mapper
 		);
 		String name = !t.methodName().equals("")
 			?	t.methodName() //name was specified in target
