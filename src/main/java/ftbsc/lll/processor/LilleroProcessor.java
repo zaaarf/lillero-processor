@@ -44,7 +44,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
 	 * of the generated injector files.
 	 */
-	private final Set<String> generatedInjectors = new HashSet<>();
+	private final Set<String> injectors = new HashSet<>();
 
 	/**
 	 * The {@link ObfuscationMapper} used to convert classes and variables
@@ -136,19 +136,16 @@ public class LilleroProcessor extends AbstractProcessor {
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		for(TypeElement annotation : annotations) {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
-				Set<TypeElement> validInjectors =
-					roundEnv.getElementsAnnotatedWith(annotation)
-						.stream()
-						.map(e -> (TypeElement) e)
-						.filter(this::isValidInjector)
-						.collect(Collectors.toSet());
-				if(!validInjectors.isEmpty())
-					validInjectors.forEach(this::generateClasses);
+				roundEnv.getElementsAnnotatedWith(annotation)
+					.stream()
+					.map(e -> (TypeElement) e)
+					.filter(this::isValidInjector)
+					.forEach(this::generateClasses);
 			} else if(annotation.getQualifiedName().contentEquals(RegisterBareInjector.class.getName())) {
 				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
 					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType))
-						this.generatedInjectors.add(((TypeElement) e).getQualifiedName().toString());
+						this.injectors.add(((TypeElement) e).getQualifiedName().toString());
 					else this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, String.format(
 						"Class %s annotated with @RegisterBareInjector is not an instance of IInjector, skipping...",
 						((TypeElement) e).getQualifiedName().toString()
@@ -156,7 +153,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-		if (!this.generatedInjectors.isEmpty()) {
+		if (!this.injectors.isEmpty()) {
 			generateServiceProvider();
 			return true;
 		} else return false;
@@ -372,7 +369,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				throw new RuntimeException(e);
 			}
 
-			this.generatedInjectors.add(injectorClassName);
+			this.injectors.add(injectorClassName);
 		}
 	}
 
@@ -386,7 +383,8 @@ public class LilleroProcessor extends AbstractProcessor {
 					StandardLocation.CLASS_OUTPUT, "", "META-INF/services/ftbsc.lll.IInjector"
 				);
 			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
-			this.generatedInjectors.forEach(out::println);
+			this.injectors.forEach(out::println);
+			this.injectors.clear();
 			out.close();
 		} catch(IOException e) {
 			throw new RuntimeException(e);
