@@ -151,27 +151,20 @@ public class JavaPoetUtils {
 		MethodSpec.Builder injectBuilder = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
 			.returns(void.class)
-			.addAnnotation(Override.class);
-
-		int argumentCount = inj.injector.getParameters().size();
-
-		if(argumentCount == 2) {
-			injectBuilder
-				.addParameter(ParameterSpec.builder(
-						TypeName.get(env
-							.getElementUtils()
-							.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz")
-					.build());
-		}
-
-		injectBuilder
+			.addAnnotation(Override.class)
+			.addParameter(ParameterSpec.builder(
+				TypeName.get(env
+					.getElementUtils()
+					.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz")
+				.build())
 			.addParameter(ParameterSpec.builder(
 				TypeName.get(env
 					.getElementUtils()
 					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main")
 				.build());
 
-		if(argumentCount == 2) injectBuilder.addStatement("super.$L(clazz, main)", inj.injector.getSimpleName());
+		if(inj.injector.getParameters().size() == 2)
+			injectBuilder.addStatement("super.$L(clazz, main)", inj.injector.getSimpleName());
 		else injectBuilder.addStatement("super.$L(main)", inj.injector.getSimpleName());
 
 		return injectBuilder.build();
