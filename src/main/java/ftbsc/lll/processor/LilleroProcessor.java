@@ -348,7 +348,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.superclass(cl.asType())
 				.addSuperinterface(ClassName.get(IInjector.class))
 				.addMethod(constructorBuilder.build())
-				.addMethod(buildStringReturnMethod("name", cl.getSimpleName().toString()))
+				.addMethod(buildStringReturnMethod("name", injName))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
 				.addMethod(buildStringReturnMethod("targetClass", obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
 				.addMethod(buildStringReturnMethod("methodName", obfuscateInjectorMetadata ? target.nameObf : target.name))
