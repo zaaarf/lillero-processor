@@ -65,11 +65,10 @@ public class LilleroProcessor extends AbstractProcessor {
 	public static boolean obfuscateInjectorMetadata = true;
 
 	/**
-	 * Initializes the processor with the processing environment by
-	 * setting the {@code processingEnv} field to the value of the
-	 * {@code processingEnv} argument.
+	 * Initializes the processor with the processing environment by setting the
+	 * {@code processingEnv} field to the value of the {@code processingEnv} argument.
 	 * @param processingEnv environment to access facilities the tool framework
-	 * provides to the processor
+	 *                      provides to the processor
 	 * @throws IllegalStateException if this method is called more than once.
 	 * @since 0.3.0
 	 */

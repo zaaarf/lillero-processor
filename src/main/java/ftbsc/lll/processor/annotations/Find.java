@@ -30,8 +30,8 @@ public @interface Find {
 	 * fully-qualified name. If it's a number instead of a valid name, the class will be
 	 * treated as an anonymous class, and will therefore be automatically unverified.
 	 * For a {@link TypeProxy}, this refers to the class itself rather than the parent.
-	 * @return the name of the inner class that contains the target,
-	 * defaults to empty string (not an inner class)
+	 * @return the name of the inner class that contains the target, defaults to empty
+	 *         string (not an inner class)
 	 * @since 0.5.0
 	 */
 	String innerName() default "";
@@ -45,8 +45,8 @@ public @interface Find {
 	 * relevant class. It is generally recommended that you use a @link Target} stub
 	 * for methods, as this can lead to unpredictable behaviour at runtime.
 	 * It will have no effect on a {@link TypeProxy}.
-	 * @return the name of the target, will default to the empty string
-	 * (the name of the annotated method will instead be used).
+	 * @return the name of the target, will default to the empty string (the name of
+	 *         the annotated method will instead be used).
 	 * @since 0.5.0
 	 */
 	String name() default "";
