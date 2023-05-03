@@ -15,7 +15,7 @@ import java.lang.annotation.RetentionPolicy;
  * @see Injector
  */
 @Retention(RetentionPolicy.CLASS)
-@Repeatable(MultipleTargets.class)
+@Repeatable(Target.List.class)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface Target {
 
@@ -52,4 +52,17 @@ public @interface Target {
 	 * @since 0.5.2
 	 */
 	boolean bridge() default false;
+
+	/**
+	 * Used to support {@link Target} as a {@link Repeatable} annotation.
+	 * @since 0.6.1
+	 */
+	@Retention(RetentionPolicy.CLASS)
+	@java.lang.annotation.Target(ElementType.METHOD)
+	@interface List {
+		/**
+		 * @return the {@link Injector} annotations, as an array
+		 */
+		Target[] value();
+	}
 }
