@@ -11,8 +11,8 @@ import java.lang.annotation.RetentionPolicy;
  * (META-INF/services/ftbsc.lll.IInjector) without actually processing it. This can
  * be used to mix in a same project regular {@link IInjector}s and those generated
  * by the processor.
- * @since 0.6.0
+ * @since 0.6.1
  */
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.TYPE)
-public @interface RegisterBareInjector {}
+public @interface BareInjector {}

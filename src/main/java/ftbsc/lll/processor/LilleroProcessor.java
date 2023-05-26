@@ -140,7 +140,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					.map(e -> (TypeElement) e)
 					.filter(this::isValidInjector)
 					.forEach(this::generateClasses);
-			} else if(annotation.getQualifiedName().contentEquals(RegisterBareInjector.class.getName())) {
+			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
 				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
 					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType))
