@@ -36,9 +36,8 @@ import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
  * The actual annotation processor behind the magic.
  * It (implicitly) implements the {@link Processor} interface by extending {@link AbstractProcessor}.
  */
-@SupportedAnnotationTypes({"ftbsc.lll.processor.annotations.Patch", "ftbsc.lll.processor.annotations.RegisterBareInjector"})
+@SupportedAnnotationTypes({"ftbsc.lll.processor.annotations.Patch", "ftbsc.lll.processor.annotations.BareInjector"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@SupportedOptions({"mappingsFile", "anonymousClassWarning", "obfuscateInjectorMetadata"})
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
@@ -50,6 +49,15 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * An object representing the various options passed to the processor.
 	 */
 	public final ProcessorOptions options =  new ProcessorOptions(processingEnv);
+
+	/**
+	 * Method overriding default implementation to manually pass supported options.
+	 * @return a {@link Set} of options supported by this processor.
+	 */
+	@Override
+	public Set<String> getSupportedOptions() {
+		return ProcessorOptions.SUPPORTED;
+	}
 
 	/**
 	 * Where the actual processing happens.
@@ -82,7 +90,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-		if (!this.injectors.isEmpty()) {
+		if (!this.options.noServiceProvider && !this.injectors.isEmpty()) {
 			generateServiceProvider();
 			return true;
 		} else return false;

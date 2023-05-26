@@ -9,12 +9,24 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Class in charge of containing, parsing and processing all processor options,
  * from the simpler booleans to the more complicated mapper.
  */
 public class ProcessorOptions {
+
+	/**
+	 * A {@link Set} of options currently supported by the processor.
+	 */
+	public static final Set<String> SUPPORTED = new HashSet<>(Arrays.asList(
+		"mappingsFile", "anonymousClassWarning", "obfuscateInjectorMetadata",
+		"noServiceProvider"
+	));
+
 	/**
 	 * The environment the processor is acting in.
 	 */
@@ -38,6 +50,10 @@ public class ProcessorOptions {
 	 */
 	public final boolean obfuscateInjectorMetadata;
 
+	/**
+	 * Whether the processor should skip the generation of the service provider.
+	 */
+	public final boolean noServiceProvider;
 
 	/**
 	 * The public constructor, parses and stores all given arguments.
@@ -71,6 +87,7 @@ public class ProcessorOptions {
 		}
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
+		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
 	}
 
 	/**
