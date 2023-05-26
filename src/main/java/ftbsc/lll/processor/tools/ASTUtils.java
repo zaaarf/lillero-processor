@@ -212,13 +212,13 @@ public class ASTUtils {
 	/**
 	 * Finds the class name and maps it to the correct format.
 	 * @param name the fully qualified name of the class to convert
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the fully qualified class name
 	 * @since 0.3.0
 	 */
-	public static String findClassName(String name, ObfuscationMapper mapper) {
+	public static String findClassName(String name, ProcessorOptions options) {
 		try {
-			return mapper == null ? name : mapper.obfuscateClass(name).replace('/', '.');
+			return options.mapper == null ? name : options.mapper.obfuscateClass(name).replace('/', '.');
 		} catch(MappingNotFoundException e) {
 			return name;
 		}

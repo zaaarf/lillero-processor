@@ -2,9 +2,8 @@ package ftbsc.lll.processor.tools.containers;
 
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.processor.tools.ProcessorOptions;
 
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
 /**
@@ -36,13 +35,12 @@ public class InjectorInfo {
 	 * @param injector the injector {@link ExecutableElement}
 	 * @param targetStub the target {@link ExecutableElement}
 	 * @param targetAnn the relevant {@link Target} annotation
-	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub, Target targetAnn, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	public InjectorInfo(ExecutableElement injector, ExecutableElement targetStub, Target targetAnn, ProcessorOptions options) {
 		this.injector = injector;
 		this.targetStub = targetStub;
 		this.reason = injector.getAnnotation(Injector.class).reason();
-		this.target = MethodContainer.from(targetStub, targetAnn, null, env, mapper);
+		this.target = MethodContainer.from(targetStub, targetAnn, null, options);
 	}
 }

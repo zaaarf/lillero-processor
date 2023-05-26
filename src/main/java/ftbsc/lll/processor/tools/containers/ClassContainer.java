@@ -1,12 +1,10 @@
 package ftbsc.lll.processor.tools.containers;
 
 import ftbsc.lll.exceptions.TargetNotFoundException;
-import ftbsc.lll.processor.LilleroProcessor;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.processor.tools.ProcessorOptions;
 
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
@@ -40,21 +38,20 @@ public class ClassContainer {
 	public final Element elem;
 
 	/**
-	 * Private constructor, called from {@link #from(Annotation, Function, String, ProcessingEnvironment, ObfuscationMapper)}.
+	 * Private constructor, called from {@link #from(Annotation, Function, String, ProcessorOptions)}.
 	 * @param fqn the fully-qualified name of the target class
 	 * @param innerNames an array of Strings containing the path to the inner class, may be null
-	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	private ClassContainer(String fqn, String[] innerNames, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	private ClassContainer(String fqn, String[] innerNames, ProcessorOptions options) {
 		//find and validate
-		Element elem = env.getElementUtils().getTypeElement(fqn);
+		Element elem = options.env.getElementUtils().getTypeElement(fqn);
 
 		if(elem == null)
 			throw new TargetNotFoundException("class", fqn);
 
 		StringBuilder fqnBuilder = new StringBuilder(
-			internalNameFromType(elem.asType(), env).replace('/', '.')
+			internalNameFromType(elem.asType(), options.env).replace('/', '.')
 		);
 
 		if(innerNames != null) {
@@ -64,8 +61,8 @@ public class ClassContainer {
 				try {
 					int anonClassCounter = Integer.parseInt(inner);
 					//anonymous classes cannot be validated!
-					if(LilleroProcessor.anonymousClassWarning)
-						env.getMessager().printMessage(
+					if(options.anonymousClassWarning)
+						options.env.getMessager().printMessage(
 							Diagnostic.Kind.WARNING,
 							String.format(
 								"Anonymous classes cannot be verified by the processor. The existence of %s$%s is not guaranteed!",
@@ -88,7 +85,7 @@ public class ClassContainer {
 			}
 		}
 		this.fqn = fqnBuilder.toString();
-		this.fqnObf = findClassName(this.fqn, mapper);
+		this.fqnObf = findClassName(this.fqn, options);
 		this.elem = elem;
 	}
 
@@ -97,33 +94,28 @@ public class ClassContainer {
 	 * @param ann the annotation containing the class
 	 * @param classFunction the annotation function returning the class
 	 * @param innerName a string containing the inner class name or nothing
-	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @param <T> the type of the annotation carrying the information
 	 * @return the fully qualified name of the given class
 	 * @since 0.5.0
 	 */
-	public static <T extends Annotation> ClassContainer from(T ann, Function<T, Class<?>> classFunction, String innerName,
-		ProcessingEnvironment env, ObfuscationMapper mapper) {
+	public static <T extends Annotation> ClassContainer from(T ann, Function<T, Class<?>> classFunction, String innerName, ProcessorOptions options) {
 		String fqn;
 		String[] inner;
-		fqn = getTypeFromAnnotation(ann, classFunction, env).toString();
+		fqn = getTypeFromAnnotation(ann, classFunction, options.env).toString();
 		inner = innerName.equals("") ? null : innerName.split("//$");
-		return new ClassContainer(fqn, inner, env, mapper);
+		return new ClassContainer(fqn, inner, options);
 	}
 
 	/**
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param cl the {@link TypeElement} representing the class
-	 * @param env the {@link ProcessingEnvironment} to be used to locate the class
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
-	 * @param <T> the type of the annotation carrying the information
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the fully qualified name of the given class
 	 * @since 0.6.0
 	 */
-	public static <T extends Annotation> ClassContainer from(
-		TypeElement cl, ProcessingEnvironment env, ObfuscationMapper mapper) {
-		return new ClassContainer(cl.getQualifiedName().toString(), null, env, mapper);
+	public static ClassContainer from(TypeElement cl, ProcessorOptions options) {
+		return new ClassContainer(cl.getQualifiedName().toString(), null, options);
 	}
 
 	/**
@@ -132,16 +124,13 @@ public class ClassContainer {
 	 * @param fallback the {@link ClassContainer} it falls back on
 	 * @param p the {@link Patch} annotation to get info from
 	 * @param f the {@link Find} annotation to get info from
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the built {@link ClassContainer} or the fallback if not enough information was present
 	 * @since 0.5.0
 	 */
-	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
-		if(f == null) return ClassContainer.from(p, Patch::value, p.innerName(), env, mapper);
-		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), env, mapper);
-		return cl.fqn.equals("java.lang.Object")
-			? fallback
-			: cl;
+	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessorOptions options) {
+		if(f == null) return ClassContainer.from(p, Patch::value, p.innerName(), options);
+		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), options);
+		return cl.fqn.equals("java.lang.Object") ? fallback : cl;
 	}
 }

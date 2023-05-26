@@ -3,17 +3,15 @@ package ftbsc.lll.processor.tools.containers;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.processor.tools.ProcessorOptions;
 import org.objectweb.asm.Type;
 
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 import static ftbsc.lll.processor.tools.ASTUtils.*;
-import static ftbsc.lll.processor.tools.ASTUtils.descriptorFromType;
 
 /**
  * Container for information about a field.
@@ -56,16 +54,13 @@ public class FieldContainer {
 	public final VariableElement elem;
 
 	/**
-	 * Private constructor, called from {@link #from(VariableElement, ProcessingEnvironment, ObfuscationMapper)}.
+	 * Private constructor, called from {@link #from(VariableElement, ProcessorOptions)}.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target field
 	 * @param descriptor the descriptor of the target field, may be null for verifiable fields
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	private FieldContainer(
-		ClassContainer parent, String name, String descriptor,
-		ProcessingEnvironment env, ObfuscationMapper mapper) {
+	private FieldContainer(ClassContainer parent, String name, String descriptor, ProcessorOptions options) {
 		this.parent = parent;
 		if(parent.elem == null) { //unverified
 			if(descriptor == null)
@@ -74,47 +69,45 @@ public class FieldContainer {
 			this.name = name;
 			this.descriptor = descriptor;
 		} else {
-			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, env);
+			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, options.env);
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromType(this.elem.asType(), env);
+			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
 		}
-		this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
-		this.nameObf = findMemberName(parent.fqn, this.name, null, mapper);
+		this.descriptorObf = options.mapper == null ? this.descriptor : options.mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
+		this.nameObf = findMemberName(parent.fqn, this.name, null, options.mapper);
 	}
 
 	/**
 	 * Finds a {@link FieldContainer} from a finder.
 	 * @param finder the {@link VariableElement} annotated with {@link Find} for this field
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the built {@link FieldContainer}
 	 * @since 0.5.0
 	 */
-	public static FieldContainer from(VariableElement finder, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	public static FieldContainer from(VariableElement finder, ProcessorOptions options) {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = finder.getEnclosingElement().getAnnotation(Patch.class);
 		//the finder always has a @Find annotation
 		Find f = finder.getAnnotation(Find.class);
 
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from((TypeElement) finder.getEnclosingElement(), env, mapper),
-			patchAnn, f, env, mapper
+			ClassContainer.from((TypeElement) finder.getEnclosingElement(), options), patchAnn, f, options
 		);
 
 		String name = f.name().equals("") ? finder.getSimpleName().toString() : f.name();
 		String descriptor;
-		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, env);
+		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, options.env);
 		if(fieldType.toString().equals("java.lang.Object")) {
 			descriptor = null;
 		} else {
 			if(fieldType.getKind() != TypeKind.VOID && !fieldType.getKind().isPrimitive())
 				descriptor = //jank af but this is temporary anyway
 					"L" + ClassContainer.from(
-						f, Find::type, f.typeInner(), env, mapper
+						f, Find::type, f.typeInner(), options
 					).fqnObf.replace('.', '/') + ";";
-			else descriptor = descriptorFromType(fieldType, env);
+			else descriptor = descriptorFromType(fieldType, options.env);
 		}
 
-		return new FieldContainer(parent, name, descriptor, env, mapper);
+		return new FieldContainer(parent, name, descriptor, options);
 	}
 }

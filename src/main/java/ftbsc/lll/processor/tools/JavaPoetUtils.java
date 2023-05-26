@@ -7,7 +7,6 @@ import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.containers.FieldContainer;
 import ftbsc.lll.processor.tools.containers.InjectorInfo;
 import ftbsc.lll.processor.tools.containers.MethodContainer;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.FieldProxy;
 import ftbsc.lll.proxies.impl.MethodProxy;
@@ -44,13 +43,12 @@ public class JavaPoetUtils {
 	 * @param stub the stub {@link ExecutableElement} if present or relevant, null otherwise
 	 * @param t the {@link Target} relevant to this finder if present or relevant, null otherwise
 	 * @param con the {@link MethodSpec.Builder} to append to
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @since 0.5.0
 	 */
 	public static void appendMemberFinderDefinition(
 		VariableElement var, ExecutableElement stub, Target t,
-		MethodSpec.Builder con, ProcessingEnvironment env, ObfuscationMapper mapper) {
+		MethodSpec.Builder con, ProcessorOptions options) {
 		ProxyType type = getProxyType(var);
 		if(type != ProxyType.METHOD && type != ProxyType.FIELD)
 			return; //this method is irrelevant to everyone else
@@ -65,13 +63,13 @@ public class JavaPoetUtils {
 		Element target;
 
 		if(isMethod) {
-			MethodContainer mc = MethodContainer.from(stub, t, f, env, mapper);
+			MethodContainer mc = MethodContainer.from(stub, t, f, options);
 			descriptorObf = mc.descriptorObf;
 			nameObf = mc.nameObf;
 			parent = mc.parent;
 			target = mc.elem;
 		} else {
-			FieldContainer fc = FieldContainer.from(var, env, mapper);
+			FieldContainer fc = FieldContainer.from(var, options);
 			descriptorObf = fc.descriptorObf;
 			nameObf = fc.nameObf;
 			parent = fc.parent;

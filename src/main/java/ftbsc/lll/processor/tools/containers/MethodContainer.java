@@ -5,9 +5,8 @@ import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.processor.tools.ProcessorOptions;
 
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 
@@ -55,18 +54,15 @@ public class MethodContainer {
 
 	/**
 	 * Private constructor, called from
-	 * {@link #from(ExecutableElement, Target, Find, ProcessingEnvironment, ObfuscationMapper)}.
+	 * {@link #from(ExecutableElement, Target, Find, ProcessorOptions)}.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target method
 	 * @param descriptor the descriptor of the target method
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
-	 * @param bridge whether the "bridge" should be matched isntead (see {@link Target#bridge()} for more info)
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
+	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	private MethodContainer(
-		ClassContainer parent, String name, String descriptor, boolean strict,
-		boolean bridge, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	private MethodContainer(ClassContainer parent, String name, String descriptor, boolean strict, boolean bridge, ProcessorOptions options) {
 		this.parent = parent;
 		if(parent.elem == null) { //unverified
 			if(descriptor == null)
@@ -76,14 +72,14 @@ public class MethodContainer {
 			this.descriptor = descriptor;
 		} else {
 			ExecutableElement tmp = (ExecutableElement) findMember(
-				parent, name, descriptor, descriptor != null && strict,false, env
+				parent, name, descriptor, descriptor != null && strict,false, options.env
 			);
-			this.elem = bridge ? findSyntheticBridge((TypeElement) this.parent.elem, tmp, env) : tmp;
+			this.elem = bridge ? findSyntheticBridge((TypeElement) this.parent.elem, tmp, options.env) : tmp;
 			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromExecutableElement(this.elem, env);
+			this.descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
-		this.descriptorObf = mapper == null ? this.descriptor : mapper.obfuscateMethodDescriptor(this.descriptor);
-		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, mapper);
+		this.descriptorObf = options.mapper == null ? this.descriptor : options.mapper.obfuscateMethodDescriptor(this.descriptor);
+		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, options.mapper);
 	}
 
 	/**
@@ -91,27 +87,25 @@ public class MethodContainer {
 	 * @param stub the {@link ExecutableElement} for the stub
 	 * @param t the {@link Target} annotation relevant to this case
 	 * @param f the {@link Find} annotation containing fallback data, may be null
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @param mapper the {@link ObfuscationMapper} to be used, may be null
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the {@link MethodContainer} corresponding to the method
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static MethodContainer from(ExecutableElement stub, Target t, Find f, ProcessingEnvironment env, ObfuscationMapper mapper) {
+	public static MethodContainer from(ExecutableElement stub, Target t, Find f, ProcessorOptions options) {
 		//the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from((TypeElement) stub.getEnclosingElement(), env, mapper),
-			patchAnn, f, env, mapper
+			ClassContainer.from((TypeElement) stub.getEnclosingElement(), options), patchAnn, f, options
 		);
 		String name = !t.methodName().equals("")
 			?	t.methodName() //name was specified in target
 			: stub.getSimpleName().toString();
 		String descriptor = t.strict()
-			? descriptorFromExecutableElement(stub, env)
+			? descriptorFromExecutableElement(stub, options.env)
 			: null;
 
-		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), env, mapper);
+		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), options);
 	}
 }

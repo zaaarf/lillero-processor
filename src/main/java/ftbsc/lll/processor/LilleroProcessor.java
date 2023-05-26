@@ -1,15 +1,17 @@
 package ftbsc.lll.processor;
 
-import com.squareup.javapoet.*;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeSpec;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
-import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.*;
+import ftbsc.lll.processor.tools.ProcessorOptions;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.processor.tools.containers.InjectorInfo;
 import ftbsc.lll.processor.tools.containers.MethodContainer;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
@@ -22,10 +24,8 @@ import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
-import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,79 +47,9 @@ public class LilleroProcessor extends AbstractProcessor {
 	private final Set<String> injectors = new HashSet<>();
 
 	/**
-	 * The {@link ObfuscationMapper} used to convert classes and variables
-	 * to their obfuscated equivalent. Will be null when no mapper is in use.
+	 * An object representing the various options passed to the processor.
 	 */
-	private ObfuscationMapper mapper = null;
-
-	/**
-	 * Whether the processor should issue warnings when compiling code anonymous
-	 * classes which can't be checked for validity.
-	 */
-	public static boolean anonymousClassWarning = true;
-
-	/**
-	 * Whether injector metadata (what is returned by the functions of {@link IInjector})
-	 * is to use obfuscated names instead of its normal names.
-	 */
-	public static boolean obfuscateInjectorMetadata = true;
-
-	/**
-	 * Initializes the processor with the processing environment by setting the
-	 * {@code processingEnv} field to the value of the {@code processingEnv} argument.
-	 * @param processingEnv environment to access facilities the tool framework
-	 *                      provides to the processor
-	 * @throws IllegalStateException if this method is called more than once.
-	 * @since 0.3.0
-	 */
-	@Override
-	public synchronized void init(ProcessingEnvironment processingEnv) {
-		super.init(processingEnv);
-		String location = processingEnv.getOptions().get("mappingsFile");
-		if(location == null)
-			mapper = null;
-		else {
-			InputStream targetStream;
-			try {
-				URI target = new URI(location);
-				targetStream = target.toURL().openStream();
-			} catch(URISyntaxException | IOException e) {
-				//may be a local file path
-				File f = new File(location);
-				if(!f.exists())
-					throw new InvalidResourceException(location);
-				try {
-					targetStream = new FileInputStream(f);
-				} catch(FileNotFoundException ex) {
-					throw new InvalidResourceException(location);
-				}
-			}
-			//assuming its tsrg file
-			//todo: replace crappy homebaked parser with actual library
-			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
-				StandardCharsets.UTF_8)).lines());
-		}
-		String anonymousClassWarn = processingEnv.getOptions().get("anonymousClassWarning");
-		if(anonymousClassWarn != null)
-			anonymousClassWarning = parseBooleanArg(anonymousClassWarn);
-		String obfuscateInj = processingEnv.getOptions().get("obfuscateInjectorMetadata");
-		if(obfuscateInj != null)
-			obfuscateInjectorMetadata = parseBooleanArg(obfuscateInj);
-	}
-
-	/**
-	 * Parses a boolean arg from a String.
-	 * @param arg the arg to parse
-	 * @return the parsed boolean
-	 */
-	private static boolean parseBooleanArg(String arg) {
-		try { // 0 = false, any other integer = true
-			int i = Integer.parseInt(arg);
-			return i != 0;
-		} catch(NumberFormatException ignored) {
-			return Boolean.parseBoolean(arg);
-		}
-	}
+	public final ProcessorOptions options =  new ProcessorOptions(processingEnv);
 
 	/**
 	 * Where the actual processing happens.
@@ -196,11 +126,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		ClassContainer targetClass = ClassContainer.from(
-			patchAnn,
-			Patch::value,
-			patchAnn.innerName(),
-			this.processingEnv,
-			this.mapper
+			patchAnn, Patch::value, patchAnn.innerName(), this.options
 		);
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -231,11 +157,10 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(type == ProxyType.TYPE) {
 				//find and validate
 				ClassContainer clazz = ClassContainer.findOrFallback(
-					ClassContainer.from(cl, this.processingEnv, this.mapper),
+					ClassContainer.from(cl, this.options),
 					patchAnn,
 					proxyVar.getAnnotation(Find.class),
-					this.processingEnv,
-					this.mapper
+					this.options
 				);
 				//types can be generated with a single instruction
 				constructorBuilder.addStatement(
@@ -251,8 +176,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					null,
 					null,
 					constructorBuilder,
-					this.processingEnv,
-					this.mapper
+					this.options
 				);
 		}
 
@@ -311,7 +235,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injector, tg, targetAnn, this.processingEnv, this.mapper)
+							new InjectorInfo(injector, tg, targetAnn, this.options)
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
@@ -323,8 +247,7 @@ public class LilleroProcessor extends AbstractProcessor {
 							tg,
 							targetAnn,
 							constructorBuilder,
-							this.processingEnv,
-							this.mapper
+							this.options
 						);
 					}
 				}
@@ -349,9 +272,9 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", injName))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", obfuscateInjectorMetadata ? target.nameObf : target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
+				.addMethod(buildStringReturnMethod("targetClass", this.options.obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
+				.addMethod(buildStringReturnMethod("methodName", this.options.obfuscateInjectorMetadata ? target.nameObf : target.name))
+				.addMethod(buildStringReturnMethod("methodDesc", this.options.obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
 				.addMethods(generateDummies(cl))
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
