@@ -10,7 +10,7 @@ import java.lang.annotation.RetentionPolicy;
  * The method annotated with this, called "stub" within the documentation, should have the
  * same name and parameters as the method it's supposed to represent.
  * It will be discarded unless the containing class is annotated with {@link Patch}
- * and another method within the class is annotated with {@link Injector}.
+ * and at least another method within the class is annotated with {@link Injector}.
  * @see Patch
  * @see Injector
  */

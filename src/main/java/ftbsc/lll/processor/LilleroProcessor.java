@@ -99,7 +99,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * This checks whether a given class contains the requirements to be parsed into a Lillero injector.
 	 * It must have at least one method annotated with {@link Target}, and one method annotated with {@link Injector}
-	 * that must take in a ClassNode and MethodNode from ObjectWeb's ASM library.
+	 * that must take in either a ClassNode and MethodNode (from ObjectWeb's ASM library) or only a MethodNode.
 	 * @param elem the element to check.
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
