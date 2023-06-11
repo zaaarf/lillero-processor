@@ -48,7 +48,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * An object representing the various options passed to the processor.
 	 */
-	public final ProcessorOptions options =  new ProcessorOptions(processingEnv);
+	private ProcessorOptions options = null;
 
 	/**
 	 * Method overriding default implementation to manually pass supported options.
@@ -57,6 +57,16 @@ public class LilleroProcessor extends AbstractProcessor {
 	@Override
 	public Set<String> getSupportedOptions() {
 		return ProcessorOptions.SUPPORTED;
+	}
+
+	/**
+	 * Returns the {@link ProcessorOptions} for this instance, creating the object if
+	 * it hasn't been already.
+	 * @return the {@link ProcessorOptions} for this instance
+	 */
+	public ProcessorOptions getProcessorOptions() {
+		if(this.options == null) this.options = new ProcessorOptions(this.processingEnv);
+		return this.options;
 	}
 
 	/**
@@ -90,7 +100,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-		if (!this.options.noServiceProvider && !this.injectors.isEmpty()) {
+		if (!this.getProcessorOptions().noServiceProvider && !this.injectors.isEmpty()) {
 			generateServiceProvider();
 			return true;
 		} else return false;
@@ -134,7 +144,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		ClassContainer targetClass = ClassContainer.from(
-			patchAnn, Patch::value, patchAnn.innerName(), this.options
+			patchAnn, Patch::value, patchAnn.innerName(), this.getProcessorOptions()
 		);
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -165,10 +175,10 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(type == ProxyType.TYPE) {
 				//find and validate
 				ClassContainer clazz = ClassContainer.findOrFallback(
-					ClassContainer.from(cl, this.options),
+					ClassContainer.from(cl, this.getProcessorOptions()),
 					patchAnn,
 					proxyVar.getAnnotation(Find.class),
-					this.options
+					this.getProcessorOptions()
 				);
 				//types can be generated with a single instruction
 				constructorBuilder.addStatement(
@@ -184,7 +194,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					null,
 					null,
 					constructorBuilder,
-					this.options
+					this.getProcessorOptions()
 				);
 		}
 
@@ -243,7 +253,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injector, tg, targetAnn, this.options)
+							new InjectorInfo(injector, tg, targetAnn, this.getProcessorOptions())
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
@@ -255,7 +265,7 @@ public class LilleroProcessor extends AbstractProcessor {
 							tg,
 							targetAnn,
 							constructorBuilder,
-							this.options
+							this.getProcessorOptions()
 						);
 					}
 				}
@@ -280,9 +290,9 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", injName))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", this.options.obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", this.options.obfuscateInjectorMetadata ? target.nameObf : target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", this.options.obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
+				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
+				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata ? target.nameObf : target.name))
+				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
 				.addMethods(generateDummies(cl))
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
