@@ -2,6 +2,7 @@ package ftbsc.lll.processor.tools.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.mapper.tools.MappingUtils;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
@@ -78,7 +79,7 @@ public class MethodContainer {
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor : options.mapper.obfuscateMethodDescriptor(this.descriptor);
+		this.descriptorObf = options.mapper == null ? this.descriptor : MappingUtils.obfuscateMethodDescriptor(this.descriptor, options.mapper);
 		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, options.mapper);
 	}
 

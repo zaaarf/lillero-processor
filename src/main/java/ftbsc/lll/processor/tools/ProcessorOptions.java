@@ -2,7 +2,7 @@ package ftbsc.lll.processor.tools;
 
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.InvalidResourceException;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.mapper.IMapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import java.io.*;
@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Class in charge of containing, parsing and processing all processor options,
@@ -33,10 +34,10 @@ public class ProcessorOptions {
 	public final ProcessingEnvironment env;
 
 	/**
-	 * The {@link ObfuscationMapper} used to convert classes and variables
+	 * The {@link IMapper} used to convert classes and variables
 	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
-	public final ObfuscationMapper mapper;
+	public final IMapper mapper;
 
 	/**
 	 * Whether the processor should issue warnings when compiling code anonymous
@@ -80,10 +81,9 @@ public class ProcessorOptions {
 					throw new InvalidResourceException(location);
 				}
 			}
-			//assuming its tsrg file
-			//todo: replace crappy homebaked parser with actual library
-			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
-				StandardCharsets.UTF_8)).lines());
+			this.mapper = IMapper.getMappers(new BufferedReader(
+				new InputStreamReader(targetStream, StandardCharsets.UTF_8)).lines().collect(Collectors.toList())
+			).iterator().next(); //TODO: add logic for choosing a specific one
 		}
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);

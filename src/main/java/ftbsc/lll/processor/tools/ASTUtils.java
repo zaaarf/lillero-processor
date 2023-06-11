@@ -6,7 +6,7 @@ import ftbsc.lll.exceptions.NotAProxyException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.mapper.IMapper;
 import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -229,11 +229,11 @@ public class ASTUtils {
 	 * @param parentFQN the unobfuscated FQN of the parent class
 	 * @param memberName the name of the member
 	 * @param methodDescriptor the descriptor of the method, may be null
-	 * @param mapper the {@link ObfuscationMapper} to use, may be null
+	 * @param mapper the {@link IMapper} to use, may be null
 	 * @return the internal class name
 	 * @since 0.3.0
 	 */
-	public static String findMemberName(String parentFQN, String memberName, String methodDescriptor, ObfuscationMapper mapper) {
+	public static String findMemberName(String parentFQN, String memberName, String methodDescriptor, IMapper mapper) {
 		try {
 			return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
 		} catch(MappingNotFoundException e) {

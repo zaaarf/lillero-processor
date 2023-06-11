@@ -1,6 +1,7 @@
 package ftbsc.lll.processor.tools.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.mapper.tools.MappingUtils;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.tools.ProcessorOptions;
@@ -73,7 +74,7 @@ public class FieldContainer {
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor : options.mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
+		this.descriptorObf = options.mapper == null ? this.descriptor : MappingUtils.obfuscateType(Type.getType(this.descriptor), options.mapper).getDescriptor();
 		this.nameObf = findMemberName(parent.fqn, this.name, null, options.mapper);
 	}
 
