@@ -1,5 +1,5 @@
 # Lillero-processor
-Lillero-processor is an annotation processor made to simplify development of [Lillero](https://git.fantabos.co/lillero) patches, minimising the amount of boilerplate code needed.
+Lillero-processor is an annotation processor made to simplify development of [Lillero](https://github.com/zaaarf/lillero) patches, minimising the amount of boilerplate code needed.
 
 An important note: to make things as easy as it is, the processor assumes that you have the code of the target available in your development environment. As of 0.6.0, it will not work otherwise.
 
