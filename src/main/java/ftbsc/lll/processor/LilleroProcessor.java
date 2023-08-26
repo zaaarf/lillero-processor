@@ -166,7 +166,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
-			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().equals("")) {
+			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().isEmpty()) {
 				//methods without a specified name will be handled later
 				methodFinders.add(proxyVar);
 				continue;
@@ -185,7 +185,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					"super.$L = $T.from($S, 0, $L)",
 					proxyVar.getSimpleName().toString(),
 					TypeProxy.class,
-					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
+					clazz.data.nameMapped.replace('/', '.'), //use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
 			} else if(type == ProxyType.FIELD)
@@ -225,11 +225,11 @@ public class LilleroProcessor extends AbstractProcessor {
 						.collect(Collectors.toList());
 
 				//throw exception if user is a moron and defined a finder and an injector with the same name
-				if(finderCandidates.size() != 0 && injectorCandidates.size() != 0)
+				if(!finderCandidates.isEmpty() && !injectorCandidates.isEmpty())
 					throw new AmbiguousDefinitionException(
 						String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
 					);
-				else if(finderCandidates.size() == 0 && injectorCandidates.size() == 0)
+				else if(finderCandidates.isEmpty() && injectorCandidates.isEmpty())
 					processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 						String.format(
 							"Found orphan @Target annotation on method %s.%s pointing at method %s, it will be ignored!",
@@ -238,11 +238,11 @@ public class LilleroProcessor extends AbstractProcessor {
 							targetAnn.of()
 						)
 					);
-				else if(finderCandidates.size() == 0 && injectorCandidates.size() != 1)
+				else if(finderCandidates.isEmpty() && injectorCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate injectors for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
 					);
-				else if(injectorCandidates.size() == 0 && finderCandidates.size() != 1)
+				else if(injectorCandidates.isEmpty() && finderCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate finders for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
 					);
@@ -290,9 +290,13 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", injName))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata ? target.nameObf : target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
+				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata
+					? targetClass.data.nameMapped.replace('/', '.')
+					: targetClass.data.name.replace('/', '.')))
+				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata
+					? target.data.nameMapped : target.data.signature.name))
+				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata
+					? target.descriptorObf : target.data.signature.name))
 				.addMethods(generateDummies(cl))
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();

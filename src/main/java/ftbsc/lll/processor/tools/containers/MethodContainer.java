@@ -3,6 +3,7 @@ package ftbsc.lll.processor.tools.containers;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.mapper.tools.MappingUtils;
+import ftbsc.lll.mapper.tools.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
@@ -20,24 +21,14 @@ import static ftbsc.lll.processor.tools.ASTUtils.*;
  */
 public class MethodContainer {
 	/**
-	 * The name of the method.
+	 * The {@link MethodData} for the method represented by this container.
 	 */
-	public final String name;
-
-	/**
-	 * The descriptor of the method.
-	 */
-	public final String descriptor;
-
-	/**
-	 * The obfuscated name of the method.
-	 * If the mapper passed is null, then this will be identical to {@link #name}.
-	 */
-	public final String nameObf;
+	public final MethodData data;
 
 	/**
 	 * The obfuscated descriptor of the field.
-	 * If the mapper passed is null, then this will be identical to {@link #descriptor}.
+	 * If the mapper passed is null, this will be identical to the one inside
+	 * {@link #data}.
 	 */
 	public final String descriptorObf;
 
@@ -69,19 +60,17 @@ public class MethodContainer {
 			if(descriptor == null)
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
 			this.elem = null;
-			this.name = name;
-			this.descriptor = descriptor;
 		} else {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, descriptor != null && strict,false, options.env
 			);
 			this.elem = bridge ? findSyntheticBridge((TypeElement) this.parent.elem, tmp, options.env) : tmp;
-			this.name = this.elem.getSimpleName().toString();
-			this.descriptor = descriptorFromExecutableElement(this.elem, options.env);
+			name = this.elem.getSimpleName().toString();
+			descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor
-			: MappingUtils.mapMethodDescriptor(this.descriptor, options.mapper, false);
-		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, options.mapper);
+		this.data = getMethodData(parent.data.name, name, descriptor, options.mapper);
+		this.descriptorObf = options.mapper == null ? this.data.signature.descriptor
+			: MappingUtils.mapMethodDescriptor(this.data.signature.descriptor, options.mapper, false);
 	}
 
 	/**
@@ -101,7 +90,7 @@ public class MethodContainer {
 		ClassContainer parent = ClassContainer.findOrFallback(
 			ClassContainer.from((TypeElement) stub.getEnclosingElement(), options), patchAnn, f, options
 		);
-		String name = !t.methodName().equals("")
+		String name = !t.methodName().isEmpty()
 			?	t.methodName() //name was specified in target
 			: stub.getSimpleName().toString();
 		String descriptor = t.strict()

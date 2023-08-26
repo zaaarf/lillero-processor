@@ -4,6 +4,9 @@ import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 import ftbsc.lll.exceptions.NotAProxyException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.mapper.tools.data.ClassData;
+import ftbsc.lll.mapper.tools.data.FieldData;
+import ftbsc.lll.mapper.tools.data.MethodData;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
 import ftbsc.lll.mapper.IMapper;
@@ -210,35 +213,59 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Finds the class name and maps it to the correct format.
-	 * @param name the fully qualified name of the class to convert
-	 * @param options the {@link ProcessorOptions} to be used
+	 * Gets the {@link ClassData} corresponding to the given fully-qualified name,
+	 * or creates a false one with the same, non-obfuscated name twice.
+	 * @param name the internal name of the class to convert
+	 * @param mapper the {@link IMapper} to use, may be null
 	 * @return the fully qualified class name
-	 * @since 0.3.0
+	 * @since 0.6.1
 	 */
-	public static String findClassName(String name, ProcessorOptions options) {
+	public static ClassData getClassData(String name, IMapper mapper) {
 		try {
-			return options.mapper == null ? name : options.mapper.obfuscateClass(name).replace('/', '.');
-		} catch(MappingNotFoundException e) {
-			return name;
-		}
+			name = name.replace('.', '/'); //just in case
+			if(mapper != null)
+				return mapper.getClassData(name);
+		} catch(MappingNotFoundException ignored) {}
+		return new ClassData(name, name);
 	}
 
 	/**
-	 * Finds the member name and maps it to the correct format.
-	 * @param parentFQN the unobfuscated FQN of the parent class
-	 * @param memberName the name of the member
-	 * @param methodDescriptor the descriptor of the method, may be null
+	 * Gets the {@link MethodData} corresponding to the method matching the given
+	 * name, parent and descriptor, or creates a dummy one with fake data if no
+	 * valid mapping is found.
+	 * @param parent the internal name of the parent class
+	 * @param name the name of the member
+	 * @param descriptor the descriptor of the method
 	 * @param mapper the {@link IMapper} to use, may be null
-	 * @return the internal class name
-	 * @since 0.3.0
+	 * @return the fully qualified class name
+	 * @since 0.6.1
 	 */
-	public static String findMemberName(String parentFQN, String memberName, String methodDescriptor, IMapper mapper) {
+	public static MethodData getMethodData(String parent, String name, String descriptor, IMapper mapper) {
 		try {
-			return mapper == null ? memberName : mapper.obfuscateMember(parentFQN, memberName, methodDescriptor);
-		} catch(MappingNotFoundException e) {
-			return memberName;
-		}
+			name = name.replace('.', '/'); //just in case
+			if(mapper != null)
+				return mapper.getMethodData(parent, name, descriptor);
+		} catch(MappingNotFoundException ignored) {}
+		return new MethodData(getClassData(name, mapper), name, name, descriptor);
+	}
+
+	/**
+	 * Gets the {@link FieldData} corresponding to the field matching the given
+	 * name and parent, or creates a dummy one with fake data if no valid
+	 * mapping is found.
+	 * @param parent the internal name of the parent class
+	 * @param name the name of the member
+	 * @param mapper the {@link IMapper} to use, may be null
+	 * @return the fully qualified class name
+	 * @since 0.6.1
+	 */
+	public static FieldData getFieldData(String parent, String name, IMapper mapper) {
+		try {
+			name = name.replace('.', '/'); //just in case
+			if(mapper != null)
+				return mapper.getFieldData(parent, name);
+		} catch(MappingNotFoundException ignored) {}
+		return new FieldData(getClassData(name, mapper), name, name);
 	}
 
 	/**
@@ -258,7 +285,7 @@ public class ASTUtils {
 		ClassContainer parent, String name, String descr,
 		boolean strict, boolean field, ProcessingEnvironment env) {
 		if(parent.elem == null)
-			throw new TargetNotFoundException("parent class", parent.fqn);
+			throw new TargetNotFoundException("parent class", parent.data.name);
 		//try to find by name
 		List<Element> candidates = parent.elem.getEnclosedElements()
 			.stream()
@@ -266,36 +293,37 @@ public class ASTUtils {
 			.filter(e -> e.getSimpleName().contentEquals(name))
 			.collect(Collectors.toList());
 
-		if(candidates.size() == 0)
-			throw new TargetNotFoundException(field ? "field" : "method", name, parent.fqn);
+		if(candidates.isEmpty())
+			throw new TargetNotFoundException(field ? "field" : "method", name, parent.data.name);
 
 		if(candidates.size() == 1 && (!strict || descr == null))
 			return candidates.get(0);
 
 		if(descr == null) {
-			throw new AmbiguousDefinitionException(
-				String.format("Found %d members named %s in class %s!", candidates.size(), name, parent.fqn)
-			);
+			throw new AmbiguousDefinitionException(String.format(
+				"Found %d members named %s in class %s!", candidates.size(), name, parent.data.name));
 		} else {
 			if(field) {
 				//fields can verify the signature for extra safety
 				//but there can only be 1 field with a given name
 				if(!descriptorFromType(candidates.get(0).asType(), env).equals(descr))
-					throw new TargetNotFoundException("field", String.format("%s with descriptor %s", name, descr), parent.fqn);
+					throw new TargetNotFoundException("field", String.format(
+						"%s with descriptor %s", name, descr), parent.data.name);
 			} else {
 				candidates = candidates.stream()
 					.map(e -> (ExecutableElement) e)
 					.filter(strict
 						? c -> descr.equals(descriptorFromExecutableElement(c, env))
-						: c -> descr.split("\\)")[0].equalsIgnoreCase(descriptorFromExecutableElement(c, env).split("\\)")[0])
+						: c -> descr.split("\\)")[0].equalsIgnoreCase(
+							descriptorFromExecutableElement(c, env).split("\\)")[0])
 					).collect(Collectors.toList());
 			}
-			if(candidates.size() == 0)
-				throw new TargetNotFoundException("method", String.format("%s %s", name, descr), parent.fqn);
+			if(candidates.isEmpty())
+				throw new TargetNotFoundException("method", String.format(
+					"%s %s", name, descr), parent.data.name);
 			if(candidates.size() > 1)
-				throw new AmbiguousDefinitionException(
-					String.format("Found %d methods named %s in class %s!", candidates.size(), name, parent.fqn)
-				);
+				throw new AmbiguousDefinitionException(String.format(
+					"Found %d methods named %s in class %s!", candidates.size(), name, parent.data.name));
 			return candidates.get(0);
 		}
 	}

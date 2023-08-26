@@ -65,13 +65,13 @@ public class JavaPoetUtils {
 		if(isMethod) {
 			MethodContainer mc = MethodContainer.from(stub, t, f, options);
 			descriptorObf = mc.descriptorObf;
-			nameObf = mc.nameObf;
+			nameObf = mc.data.nameMapped;
 			parent = mc.parent;
 			target = mc.elem;
 		} else {
 			FieldContainer fc = FieldContainer.from(var, options);
 			descriptorObf = fc.descriptorObf;
-			nameObf = fc.nameObf;
+			nameObf = fc.data.nameMapped;
 			parent = fc.parent;
 			target = fc.elem;
 		}
@@ -88,7 +88,7 @@ public class JavaPoetUtils {
 		con.addStatement(
 			"$L.setParent($S, $L)",
 			builderName,
-			parent.fqnObf,
+			parent.data.nameMapped.replace('/', '.'),
 			parent.elem == null ? 0 : mapModifiers(parent.elem.getModifiers())
 		);
 

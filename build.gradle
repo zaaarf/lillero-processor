@@ -22,7 +22,7 @@ dependencies {
 	implementation 'com.squareup:javapoet:1.13.0'
 	implementation 'org.ow2.asm:asm-commons:9.5'
 	implementation 'ftbsc:lll:0.4.2'
-	implementation 'ftbsc.lll:mapper:0.1.0'
+	implementation 'ftbsc.lll:mapper:0.2.0'
 }
 
 jar {
