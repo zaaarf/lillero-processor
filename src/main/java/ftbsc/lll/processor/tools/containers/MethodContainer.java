@@ -79,7 +79,8 @@ public class MethodContainer {
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor : MappingUtils.obfuscateMethodDescriptor(this.descriptor, options.mapper);
+		this.descriptorObf = options.mapper == null ? this.descriptor
+			: MappingUtils.mapMethodDescriptor(this.descriptor, options.mapper, false);
 		this.nameObf = findMemberName(parent.fqn, this.name, this.descriptor, options.mapper);
 	}
 

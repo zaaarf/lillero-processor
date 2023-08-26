@@ -1,18 +1,14 @@
 package ftbsc.lll.processor.tools;
 
 import ftbsc.lll.IInjector;
-import ftbsc.lll.exceptions.InvalidResourceException;
 import ftbsc.lll.mapper.IMapper;
+import ftbsc.lll.mapper.MapperProvider;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Class in charge of containing, parsing and processing all processor options,
@@ -63,28 +59,11 @@ public class ProcessorOptions {
 	public ProcessorOptions(ProcessingEnvironment env) {
 		this.env = env;
 		String location = env.getOptions().get("mappingsFile");
-		if(location == null)
-			this.mapper = null;
-		else {
-			InputStream targetStream;
-			try {
-				URI target = new URI(location);
-				targetStream = target.toURL().openStream();
-			} catch(URISyntaxException | IOException e) {
-				//may be a local file path
-				File f = new File(location);
-				if(!f.exists())
-					throw new InvalidResourceException(location);
-				try {
-					targetStream = new FileInputStream(f);
-				} catch(FileNotFoundException ex) {
-					throw new InvalidResourceException(location);
-				}
-			}
-			this.mapper = IMapper.getMappers(new BufferedReader(
-				new InputStreamReader(targetStream, StandardCharsets.UTF_8)).lines().collect(Collectors.toList())
-			).iterator().next(); //TODO: add logic for choosing a specific one
-		}
+		if(location != null) {
+			List<String> lines = MapperProvider.fetchFromLocalOrRemote(location);
+			this.mapper = MapperProvider.getMapper(lines);
+			this.mapper.populate(lines, true);
+		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);

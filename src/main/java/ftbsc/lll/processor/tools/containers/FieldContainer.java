@@ -74,7 +74,8 @@ public class FieldContainer {
 			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor : MappingUtils.obfuscateType(Type.getType(this.descriptor), options.mapper).getDescriptor();
+		this.descriptorObf = options.mapper == null ? this.descriptor
+			: MappingUtils.mapType(Type.getType(this.descriptor), options.mapper, false).getDescriptor();
 		this.nameObf = findMemberName(parent.fqn, this.name, null, options.mapper);
 	}
 
