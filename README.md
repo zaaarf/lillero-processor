@@ -114,7 +114,7 @@ Anonymous classes are numbered by the compiler in the order it meets them, start
 * Finders for anonymous class fields may be made, but their type has to be specified explicitly, unlike all others, by using the `type()` and `typeInner()` parameters.
 	- Local variables of the containing method may sometimes be accessible by an anonymous class. Make sure to use the `name` parameter of the finder appending the `val$` prefix, such as `val$actualName`.
 
-The extra `@Find` parameters (`type()' and `typeInner()`) are meant to be temporary, hacky workarounds until a better way is found. Expect them to change and be removed without notice. 
+The extra `@Find` parameters (`type()` and `typeInner()`) are meant to be temporary, hacky workarounds until a better way is found. Expect them to change and be removed without notice. 
 
 Most if not all of this (although I have not tested it) should apply to local classes as well.
 
