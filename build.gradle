@@ -7,8 +7,7 @@ archivesBaseName = 'processor'
 version = gitVersion()
 
 java {
-	sourceCompatibility = JavaVersion.VERSION_1_8
-	targetCompatibility = JavaVersion.VERSION_1_8
+	sourceCompatibility = targetCompatibility JavaVersion.VERSION_1_8
 	withSourcesJar()
 	withJavadocJar()
 }
@@ -22,7 +21,7 @@ dependencies {
 	implementation 'com.squareup:javapoet:1.13.0'
 	implementation 'org.ow2.asm:asm-commons:9.5'
 	implementation 'ftbsc:lll:0.4.2'
-	implementation 'ftbsc.lll:mapper:0.2.0'
+	implementation 'ftbsc.lll:mapper:0.3.0'
 }
 
 jar {

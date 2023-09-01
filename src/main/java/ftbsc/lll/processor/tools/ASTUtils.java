@@ -4,12 +4,12 @@ import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
 import ftbsc.lll.exceptions.NotAProxyException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.mapper.tools.Mapper;
 import ftbsc.lll.mapper.tools.data.ClassData;
 import ftbsc.lll.mapper.tools.data.FieldData;
 import ftbsc.lll.mapper.tools.data.MethodData;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.tools.containers.ClassContainer;
-import ftbsc.lll.mapper.IMapper;
 import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -216,11 +216,11 @@ public class ASTUtils {
 	 * Gets the {@link ClassData} corresponding to the given fully-qualified name,
 	 * or creates a false one with the same, non-obfuscated name twice.
 	 * @param name the internal name of the class to convert
-	 * @param mapper the {@link IMapper} to use, may be null
+	 * @param mapper the {@link Mapper} to use, may be null
 	 * @return the fully qualified class name
 	 * @since 0.6.1
 	 */
-	public static ClassData getClassData(String name, IMapper mapper) {
+	public static ClassData getClassData(String name, Mapper mapper) {
 		try {
 			name = name.replace('.', '/'); //just in case
 			if(mapper != null)
@@ -236,11 +236,11 @@ public class ASTUtils {
 	 * @param parent the internal name of the parent class
 	 * @param name the name of the member
 	 * @param descriptor the descriptor of the method
-	 * @param mapper the {@link IMapper} to use, may be null
+	 * @param mapper the {@link Mapper} to use, may be null
 	 * @return the fully qualified class name
 	 * @since 0.6.1
 	 */
-	public static MethodData getMethodData(String parent, String name, String descriptor, IMapper mapper) {
+	public static MethodData getMethodData(String parent, String name, String descriptor, Mapper mapper) {
 		try {
 			name = name.replace('.', '/'); //just in case
 			if(mapper != null)
@@ -255,11 +255,11 @@ public class ASTUtils {
 	 * mapping is found.
 	 * @param parent the internal name of the parent class
 	 * @param name the name of the member
-	 * @param mapper the {@link IMapper} to use, may be null
+	 * @param mapper the {@link Mapper} to use, may be null
 	 * @return the fully qualified class name
 	 * @since 0.6.1
 	 */
-	public static FieldData getFieldData(String parent, String name, IMapper mapper) {
+	public static FieldData getFieldData(String parent, String name, Mapper mapper) {
 		try {
 			name = name.replace('.', '/'); //just in case
 			if(mapper != null)

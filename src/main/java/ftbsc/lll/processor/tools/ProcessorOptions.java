@@ -1,8 +1,8 @@
 package ftbsc.lll.processor.tools;
 
 import ftbsc.lll.IInjector;
-import ftbsc.lll.mapper.IMapper;
 import ftbsc.lll.mapper.MapperProvider;
+import ftbsc.lll.mapper.tools.Mapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import java.util.Arrays;
@@ -30,10 +30,10 @@ public class ProcessorOptions {
 	public final ProcessingEnvironment env;
 
 	/**
-	 * The {@link IMapper} used to convert classes and variables
+	 * The {@link Mapper} used to convert classes and variables
 	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
-	public final IMapper mapper;
+	public final Mapper mapper;
 
 	/**
 	 * Whether the processor should issue warnings when compiling code anonymous
@@ -61,8 +61,7 @@ public class ProcessorOptions {
 		String location = env.getOptions().get("mappingsFile");
 		if(location != null) {
 			List<String> lines = MapperProvider.fetchFromLocalOrRemote(location);
-			this.mapper = MapperProvider.getMapper(lines);
-			this.mapper.populate(lines, true);
+			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, true);
 		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
