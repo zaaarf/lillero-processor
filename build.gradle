@@ -12,6 +12,13 @@ java {
 	withJavadocJar()
 }
 
+javadoc {
+	options {
+		links 'https://lll.fantabos.co/javadoc/lillero/'
+		links 'https://square.github.io/javapoet/javadoc/javapoet/'
+	}
+}
+
 repositories {
 	mavenCentral()
 	maven { url = 'https://maven.fantabos.co' }
