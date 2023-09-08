@@ -22,7 +22,3 @@ dependencies {
 	implementation 'org.ow2.asm:asm-commons:9.5'
 	implementation 'ftbsc:lll:0.4.1'
 }
-
-jar {
-	archiveFileName = "${jar.archiveBaseName.get()}-${project.version}.${jar.archiveExtension.get()}"
-}
