@@ -1,8 +1,8 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 
 import javax.lang.model.element.ExecutableElement;
 

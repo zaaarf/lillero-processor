@@ -1,4 +1,4 @@
-package ftbsc.lll.processor.tools;
+package ftbsc.lll.processor;
 
 import ftbsc.lll.IInjector;
 import ftbsc.lll.mapper.MapperProvider;

@@ -1,11 +1,11 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.mapper.tools.MappingUtils;
 import ftbsc.lll.mapper.tools.data.FieldData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 import org.objectweb.asm.Type;
 
 import javax.lang.model.element.TypeElement;
@@ -13,7 +13,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
 
 /**
  * Container for information about a field.

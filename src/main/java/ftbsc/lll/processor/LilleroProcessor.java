@@ -8,10 +8,9 @@ import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.*;
-import ftbsc.lll.processor.tools.ProcessorOptions;
-import ftbsc.lll.processor.tools.containers.ClassContainer;
-import ftbsc.lll.processor.tools.containers.InjectorInfo;
-import ftbsc.lll.processor.tools.containers.MethodContainer;
+import ftbsc.lll.processor.containers.ClassContainer;
+import ftbsc.lll.processor.containers.InjectorInfo;
+import ftbsc.lll.processor.containers.MethodContainer;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
@@ -29,8 +28,8 @@ import java.io.PrintWriter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
+import static ftbsc.lll.processor.utils.JavaPoetUtils.*;
 
 /**
  * The actual annotation processor behind the magic.

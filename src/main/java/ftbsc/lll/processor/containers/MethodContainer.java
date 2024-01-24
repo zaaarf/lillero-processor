@@ -1,4 +1,4 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
@@ -7,12 +7,12 @@ import ftbsc.lll.mapper.tools.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
 
 /**
  * Container for information about a method.

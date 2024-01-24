@@ -1,10 +1,10 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.TargetNotFoundException;
 import ftbsc.lll.mapper.tools.data.ClassData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -12,7 +12,7 @@ import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.function.Function;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
 
 /**
  * Container for information about a class.

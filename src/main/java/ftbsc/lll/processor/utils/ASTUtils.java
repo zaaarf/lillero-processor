@@ -1,4 +1,4 @@
-package ftbsc.lll.processor.tools;
+package ftbsc.lll.processor.utils;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.MappingNotFoundException;
@@ -9,7 +9,7 @@ import ftbsc.lll.mapper.tools.data.ClassData;
 import ftbsc.lll.mapper.tools.data.FieldData;
 import ftbsc.lll.mapper.tools.data.MethodData;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.containers.ClassContainer;
+import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;

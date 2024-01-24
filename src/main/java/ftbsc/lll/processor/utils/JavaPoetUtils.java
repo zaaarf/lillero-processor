@@ -1,12 +1,13 @@
-package ftbsc.lll.processor.tools;
+package ftbsc.lll.processor.utils;
 
 import com.squareup.javapoet.*;
+import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.tools.containers.ClassContainer;
-import ftbsc.lll.processor.tools.containers.FieldContainer;
-import ftbsc.lll.processor.tools.containers.InjectorInfo;
-import ftbsc.lll.processor.tools.containers.MethodContainer;
+import ftbsc.lll.processor.containers.ClassContainer;
+import ftbsc.lll.processor.containers.FieldContainer;
+import ftbsc.lll.processor.containers.InjectorInfo;
+import ftbsc.lll.processor.containers.MethodContainer;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.FieldProxy;
 import ftbsc.lll.proxies.impl.MethodProxy;
@@ -15,8 +16,8 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import java.util.HashSet;
 
-import static ftbsc.lll.processor.tools.ASTUtils.getProxyType;
-import static ftbsc.lll.processor.tools.ASTUtils.mapModifiers;
+import static ftbsc.lll.processor.utils.ASTUtils.getProxyType;
+import static ftbsc.lll.processor.utils.ASTUtils.mapModifiers;
 
 /**
  * Collection of static utils that rely on JavaPoet to function.
