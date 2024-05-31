@@ -15,6 +15,7 @@ import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
 import javax.annotation.processing.*;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
@@ -54,6 +55,15 @@ public class LilleroProcessor extends AbstractProcessor {
 	@Override
 	public Set<String> getSupportedOptions() {
 		return ProcessorOptions.SUPPORTED;
+	}
+
+	/**
+	 * Always returns the latest version since this should never break.
+	 * @return the latest version
+	 */
+	@Override
+	public SourceVersion getSupportedSourceVersion() {
+		return SourceVersion.latest();
 	}
 
 	/**
