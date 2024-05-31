@@ -1,9 +1,11 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.mapper.tools.MappingUtils;
+import ftbsc.lll.mapper.tools.data.FieldData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 import org.objectweb.asm.Type;
 
 import javax.lang.model.element.TypeElement;
@@ -11,7 +13,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
 
 /**
  * Container for information about a field.
@@ -20,20 +22,14 @@ import static ftbsc.lll.processor.tools.ASTUtils.*;
  */
 public class FieldContainer {
 	/**
-	 * The name of the field.
+	 * The {@link FieldData} for the field represented by this container.
 	 */
-	public final String name;
+	public final FieldData data;
 
 	/**
 	 * The descriptor of the field.
 	 */
 	public final String descriptor;
-
-	/**
-	 * The obfuscated name of the field.
-	 * If the mapper passed is null, then this will be identical to {@link #name}.
-	 */
-	public final String nameObf;
 
 	/**
 	 * The obfuscated descriptor of the field.
@@ -66,15 +62,15 @@ public class FieldContainer {
 			if(descriptor == null)
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for fields of unverifiable classes!");
 			this.elem = null;
-			this.name = name;
 			this.descriptor = descriptor;
 		} else {
 			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, options.env);
-			this.name = this.elem.getSimpleName().toString();
 			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
+			name = this.elem.getSimpleName().toString();
 		}
-		this.descriptorObf = options.mapper == null ? this.descriptor : options.mapper.obfuscateType(Type.getType(this.descriptor)).getDescriptor();
-		this.nameObf = findMemberName(parent.fqn, this.name, null, options.mapper);
+		this.data = getFieldData(parent.data.name, name, options.mapper);
+		this.descriptorObf = options.mapper == null ? this.descriptor
+			: MappingUtils.mapType(Type.getType(this.descriptor), options.mapper, false).getDescriptor();
 	}
 
 	/**
@@ -94,7 +90,7 @@ public class FieldContainer {
 			ClassContainer.from((TypeElement) finder.getEnclosingElement(), options), patchAnn, f, options
 		);
 
-		String name = f.name().equals("") ? finder.getSimpleName().toString() : f.name();
+		String name = f.name().isEmpty() ? finder.getSimpleName().toString() : f.name();
 		String descriptor;
 		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, options.env);
 		if(fieldType.toString().equals("java.lang.Object")) {
@@ -104,7 +100,7 @@ public class FieldContainer {
 				descriptor = //jank af but this is temporary anyway
 					"L" + ClassContainer.from(
 						f, Find::type, f.typeInner(), options
-					).fqnObf.replace('.', '/') + ";";
+					).data.nameMapped + ";";
 			else descriptor = descriptorFromType(fieldType, options.env);
 		}
 

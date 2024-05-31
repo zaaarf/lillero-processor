@@ -1,9 +1,10 @@
-package ftbsc.lll.processor.tools.containers;
+package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.mapper.tools.data.ClassData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
-import ftbsc.lll.processor.tools.ProcessorOptions;
+import ftbsc.lll.processor.ProcessorOptions;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -11,7 +12,7 @@ import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.function.Function;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
 
 /**
  * Container for information about a class.
@@ -20,15 +21,9 @@ import static ftbsc.lll.processor.tools.ASTUtils.*;
  */
 public class ClassContainer {
 	/**
-	 * The fully-qualified name of the class.
+	 * The {@link ClassData} for the class represented by this container.
 	 */
-	public final String fqn;
-
-	/**
-	 * The obfuscated fully-qualified name of the class.
-	 * If the mapper passed is null, then this will be identical to {@link #fqn}
-	 */
-	public final String fqnObf;
+	public final ClassData data;
 
 	/**
 	 * The {@link Element} corresponding to the class.
@@ -84,8 +79,7 @@ public class ClassContainer {
 					throw new TargetNotFoundException("class", inner);
 			}
 		}
-		this.fqn = fqnBuilder.toString();
-		this.fqnObf = findClassName(this.fqn, options);
+		this.data = getClassData(fqnBuilder.toString(), options.mapper);
 		this.elem = elem;
 	}
 
@@ -131,6 +125,6 @@ public class ClassContainer {
 	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessorOptions options) {
 		if(f == null) return ClassContainer.from(p, Patch::value, p.innerName(), options);
 		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), options);
-		return cl.fqn.equals("java.lang.Object") ? fallback : cl;
+		return cl.data.name.equals("java/lang/Object") ? fallback : cl;
 	}
 }

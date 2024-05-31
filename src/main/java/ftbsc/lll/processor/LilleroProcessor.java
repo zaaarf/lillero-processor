@@ -8,10 +8,9 @@ import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.*;
-import ftbsc.lll.processor.tools.ProcessorOptions;
-import ftbsc.lll.processor.tools.containers.ClassContainer;
-import ftbsc.lll.processor.tools.containers.InjectorInfo;
-import ftbsc.lll.processor.tools.containers.MethodContainer;
+import ftbsc.lll.processor.containers.ClassContainer;
+import ftbsc.lll.processor.containers.InjectorInfo;
+import ftbsc.lll.processor.containers.MethodContainer;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
@@ -29,8 +28,8 @@ import java.io.PrintWriter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static ftbsc.lll.processor.tools.ASTUtils.*;
-import static ftbsc.lll.processor.tools.JavaPoetUtils.*;
+import static ftbsc.lll.processor.utils.ASTUtils.*;
+import static ftbsc.lll.processor.utils.JavaPoetUtils.*;
 
 /**
  * The actual annotation processor behind the magic.
@@ -48,7 +47,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * An object representing the various options passed to the processor.
 	 */
-	public final ProcessorOptions options =  new ProcessorOptions(processingEnv);
+	private ProcessorOptions options = null;
 
 	/**
 	 * Method overriding default implementation to manually pass supported options.
@@ -57,6 +56,16 @@ public class LilleroProcessor extends AbstractProcessor {
 	@Override
 	public Set<String> getSupportedOptions() {
 		return ProcessorOptions.SUPPORTED;
+	}
+
+	/**
+	 * Returns the {@link ProcessorOptions} for this instance, creating the object if
+	 * it hasn't been already.
+	 * @return the {@link ProcessorOptions} for this instance
+	 */
+	public ProcessorOptions getProcessorOptions() {
+		if(this.options == null) this.options = new ProcessorOptions(this.processingEnv);
+		return this.options;
 	}
 
 	/**
@@ -90,7 +99,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-		if (!this.options.noServiceProvider && !this.injectors.isEmpty()) {
+		if (!this.getProcessorOptions().noServiceProvider && !this.injectors.isEmpty()) {
 			generateServiceProvider();
 			return true;
 		} else return false;
@@ -134,7 +143,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		ClassContainer targetClass = ClassContainer.from(
-			patchAnn, Patch::value, patchAnn.innerName(), this.options
+			patchAnn, Patch::value, patchAnn.innerName(), this.getProcessorOptions()
 		);
 		//find package information
 		Element packageElement = cl.getEnclosingElement();
@@ -156,7 +165,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
-			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().equals("")) {
+			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().isEmpty()) {
 				//methods without a specified name will be handled later
 				methodFinders.add(proxyVar);
 				continue;
@@ -165,17 +174,17 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(type == ProxyType.TYPE) {
 				//find and validate
 				ClassContainer clazz = ClassContainer.findOrFallback(
-					ClassContainer.from(cl, this.options),
+					ClassContainer.from(cl, this.getProcessorOptions()),
 					patchAnn,
 					proxyVar.getAnnotation(Find.class),
-					this.options
+					this.getProcessorOptions()
 				);
 				//types can be generated with a single instruction
 				constructorBuilder.addStatement(
 					"super.$L = $T.from($S, 0, $L)",
 					proxyVar.getSimpleName().toString(),
 					TypeProxy.class,
-					clazz.fqnObf, //use obf name, at runtime it will be obfuscated
+					clazz.data.nameMapped.replace('/', '.'), //use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
 			} else if(type == ProxyType.FIELD)
@@ -184,7 +193,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					null,
 					null,
 					constructorBuilder,
-					this.options
+					this.getProcessorOptions()
 				);
 		}
 
@@ -215,11 +224,11 @@ public class LilleroProcessor extends AbstractProcessor {
 						.collect(Collectors.toList());
 
 				//throw exception if user is a moron and defined a finder and an injector with the same name
-				if(finderCandidates.size() != 0 && injectorCandidates.size() != 0)
+				if(!finderCandidates.isEmpty() && !injectorCandidates.isEmpty())
 					throw new AmbiguousDefinitionException(
 						String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
 					);
-				else if(finderCandidates.size() == 0 && injectorCandidates.size() == 0)
+				else if(finderCandidates.isEmpty() && injectorCandidates.isEmpty())
 					processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 						String.format(
 							"Found orphan @Target annotation on method %s.%s pointing at method %s, it will be ignored!",
@@ -228,11 +237,11 @@ public class LilleroProcessor extends AbstractProcessor {
 							targetAnn.of()
 						)
 					);
-				else if(finderCandidates.size() == 0 && injectorCandidates.size() != 1)
+				else if(finderCandidates.isEmpty() && injectorCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate injectors for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
 					);
-				else if(injectorCandidates.size() == 0 && finderCandidates.size() != 1)
+				else if(injectorCandidates.isEmpty() && finderCandidates.size() != 1)
 					throw new AmbiguousDefinitionException(
 						String.format("Found multiple candidate finders for target %s::%s!", cl.getSimpleName(), tg.getSimpleName())
 					);
@@ -243,7 +252,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
-							new InjectorInfo(injector, tg, targetAnn, this.options)
+							new InjectorInfo(injector, tg, targetAnn, this.getProcessorOptions())
 						);
 						iterationNumber++; //increment is only used by injectors
 					} else {
@@ -255,7 +264,7 @@ public class LilleroProcessor extends AbstractProcessor {
 							tg,
 							targetAnn,
 							constructorBuilder,
-							this.options
+							this.getProcessorOptions()
 						);
 					}
 				}
@@ -280,9 +289,13 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(constructorBuilder.build())
 				.addMethod(buildStringReturnMethod("name", injName))
 				.addMethod(buildStringReturnMethod("reason", toGenerate.get(injName).reason))
-				.addMethod(buildStringReturnMethod("targetClass", this.options.obfuscateInjectorMetadata ? targetClass.fqnObf : targetClass.fqn))
-				.addMethod(buildStringReturnMethod("methodName", this.options.obfuscateInjectorMetadata ? target.nameObf : target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", this.options.obfuscateInjectorMetadata ? target.descriptorObf : target.descriptor))
+				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata
+					? targetClass.data.nameMapped.replace('/', '.')
+					: targetClass.data.name.replace('/', '.')))
+				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata
+					? target.data.nameMapped : target.data.signature.name))
+				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata
+					? target.descriptorObf : target.data.signature.name))
 				.addMethods(generateDummies(cl))
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();

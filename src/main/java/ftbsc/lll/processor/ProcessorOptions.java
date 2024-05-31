@@ -1,16 +1,13 @@
-package ftbsc.lll.processor.tools;
+package ftbsc.lll.processor;
 
 import ftbsc.lll.IInjector;
-import ftbsc.lll.exceptions.InvalidResourceException;
-import ftbsc.lll.processor.tools.obfuscation.ObfuscationMapper;
+import ftbsc.lll.mapper.MapperProvider;
+import ftbsc.lll.mapper.tools.Mapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -33,10 +30,10 @@ public class ProcessorOptions {
 	public final ProcessingEnvironment env;
 
 	/**
-	 * The {@link ObfuscationMapper} used to convert classes and variables
+	 * The {@link Mapper} used to convert classes and variables
 	 * to their obfuscated equivalent. Will be null when no mapper is in use.
 	 */
-	public final ObfuscationMapper mapper;
+	public final Mapper mapper;
 
 	/**
 	 * Whether the processor should issue warnings when compiling code anonymous
@@ -62,29 +59,10 @@ public class ProcessorOptions {
 	public ProcessorOptions(ProcessingEnvironment env) {
 		this.env = env;
 		String location = env.getOptions().get("mappingsFile");
-		if(location == null)
-			this.mapper = null;
-		else {
-			InputStream targetStream;
-			try {
-				URI target = new URI(location);
-				targetStream = target.toURL().openStream();
-			} catch(URISyntaxException | IOException e) {
-				//may be a local file path
-				File f = new File(location);
-				if(!f.exists())
-					throw new InvalidResourceException(location);
-				try {
-					targetStream = new FileInputStream(f);
-				} catch(FileNotFoundException ex) {
-					throw new InvalidResourceException(location);
-				}
-			}
-			//assuming its tsrg file
-			//todo: replace crappy homebaked parser with actual library
-			this.mapper = new ObfuscationMapper(new BufferedReader(new InputStreamReader(targetStream,
-				StandardCharsets.UTF_8)).lines());
-		}
+		if(location != null) {
+			List<String> lines = MapperProvider.fetchFromLocalOrRemote(location);
+			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, true);
+		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
