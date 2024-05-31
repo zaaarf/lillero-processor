@@ -15,7 +15,6 @@ import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
 import javax.annotation.processing.*;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
@@ -36,7 +35,6 @@ import static ftbsc.lll.processor.utils.JavaPoetUtils.*;
  * It (implicitly) implements the {@link Processor} interface by extending {@link AbstractProcessor}.
  */
 @SupportedAnnotationTypes({"ftbsc.lll.processor.annotations.Patch", "ftbsc.lll.processor.annotations.BareInjector"})
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names

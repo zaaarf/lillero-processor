@@ -1,8 +1,8 @@
 package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
-import ftbsc.lll.mapper.tools.MappingUtils;
-import ftbsc.lll.mapper.tools.data.FieldData;
+import ftbsc.lll.mapper.utils.MappingUtils;
+import ftbsc.lll.mapper.data.FieldData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;

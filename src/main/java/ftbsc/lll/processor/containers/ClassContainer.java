@@ -1,7 +1,7 @@
 package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.TargetNotFoundException;
-import ftbsc.lll.mapper.tools.data.ClassData;
+import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;

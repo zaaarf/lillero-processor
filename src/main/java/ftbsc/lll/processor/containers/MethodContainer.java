@@ -2,8 +2,8 @@ package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
-import ftbsc.lll.mapper.tools.MappingUtils;
-import ftbsc.lll.mapper.tools.data.MethodData;
+import ftbsc.lll.mapper.utils.MappingUtils;
+import ftbsc.lll.mapper.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;

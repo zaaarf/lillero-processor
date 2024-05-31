@@ -2,7 +2,7 @@ package ftbsc.lll.processor;
 
 import ftbsc.lll.IInjector;
 import ftbsc.lll.mapper.MapperProvider;
-import ftbsc.lll.mapper.tools.Mapper;
+import ftbsc.lll.mapper.utils.Mapper;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import java.util.Arrays;
