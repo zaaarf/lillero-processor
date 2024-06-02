@@ -65,14 +65,13 @@ public class MethodContainer {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, descriptor != null && strict,false, options.env
 			);
-			this.elem = bridge ? findSyntheticBridge((TypeElement) this.parent.elem, tmp, options.env) : tmp;
+			this.elem = bridge ? findSyntheticBridge(this.parent.elem, tmp, options.env) : tmp;
 			name = this.elem.getSimpleName().toString();
 			descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
 
 		// some mapping formats omit methods if they are overriding a parent's method
 		// since there is no drawback but efficiency, let's use the top parent's name for that (when possible)
-		String mappedName = null;
 		if(this.parent.elem != null) {
 			ExecutableElement top = findOverloadedMethod(this.parent.elem, this.elem, options.env);
 			ClassData topParentData = getClassData(
@@ -83,8 +82,8 @@ public class MethodContainer {
 			this.data = new MethodData(
 				parent.data,
 				topData.signature.name,
-				topData.signature.descriptor,
-				topData.nameMapped
+				topData.nameMapped,
+				topData.signature.descriptor
 			);
 		} else this.data = getMethodData(parent.data.name, name, descriptor, options.mapper);
 
