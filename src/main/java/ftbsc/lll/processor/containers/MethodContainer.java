@@ -2,6 +2,7 @@ package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.utils.MappingUtils;
 import ftbsc.lll.mapper.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
@@ -56,7 +57,7 @@ public class MethodContainer {
 	 */
 	private MethodContainer(ClassContainer parent, String name, String descriptor, boolean strict, boolean bridge, ProcessorOptions options) {
 		this.parent = parent;
-		if(parent.elem == null) { //unverified
+		if(parent.elem == null) { // unverified
 			if(descriptor == null)
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
 			this.elem = null;
@@ -68,7 +69,25 @@ public class MethodContainer {
 			name = this.elem.getSimpleName().toString();
 			descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
-		this.data = getMethodData(parent.data.name, name, descriptor, options.mapper);
+
+		// some mapping formats omit methods if they are overriding a parent's method
+		// since there is no drawback but efficiency, let's use the top parent's name for that (when possible)
+		String mappedName = null;
+		if(this.parent.elem != null) {
+			ExecutableElement top = findOverloadedMethod(this.parent.elem, this.elem, options.env);
+			ClassData topParentData = getClassData(
+				internalNameFromType(top.getEnclosingElement().asType(), options.env),
+				options.mapper
+			);
+			MethodData topData = getMethodData(topParentData.name, name, descriptor, options.mapper);
+			this.data = new MethodData(
+				parent.data,
+				topData.signature.name,
+				topData.signature.descriptor,
+				topData.nameMapped
+			);
+		} else this.data = getMethodData(parent.data.name, name, descriptor, options.mapper);
+
 		this.descriptorObf = options.mapper == null ? this.data.signature.descriptor
 			: MappingUtils.mapMethodDescriptor(this.data.signature.descriptor, options.mapper, false);
 	}

@@ -6,7 +6,6 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
 
-import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
@@ -26,11 +25,11 @@ public class ClassContainer {
 	public final ClassData data;
 
 	/**
-	 * The {@link Element} corresponding to the class.
+	 * The {@link TypeElement} corresponding to the class.
 	 * May only be null intentionally i.e. when the associated element is
 	 * an anonymous class or a child of an anonymous class.
 	 */
-	public final Element elem;
+	public final TypeElement elem;
 
 	/**
 	 * Private constructor, called from {@link #from(Annotation, Function, String, ProcessorOptions)}.
@@ -40,7 +39,7 @@ public class ClassContainer {
 	 */
 	private ClassContainer(String fqn, String[] innerNames, ProcessorOptions options) {
 		//find and validate
-		Element elem = options.env.getElementUtils().getTypeElement(fqn);
+		TypeElement elem = options.env.getElementUtils().getTypeElement(fqn);
 
 		if(elem == null)
 			throw new TargetNotFoundException("class", fqn);
@@ -71,6 +70,7 @@ public class ClassContainer {
 						.getEnclosedElements()
 						.stream()
 						.filter(e -> e instanceof TypeElement)
+						.map(e -> (TypeElement) e)
 						.filter(e -> e.getSimpleName().contentEquals(inner))
 						.findFirst()
 						.orElse(null);
