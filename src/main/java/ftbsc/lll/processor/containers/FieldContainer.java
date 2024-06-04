@@ -58,7 +58,7 @@ public class FieldContainer {
 	 */
 	private FieldContainer(ClassContainer parent, String name, String descriptor, ProcessorOptions options) {
 		this.parent = parent;
-		if(parent.elem == null) { //unverified
+		if(parent.elem == null) { // unverified
 			if(descriptor == null)
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for fields of unverifiable classes!");
 			this.elem = null;
@@ -81,9 +81,9 @@ public class FieldContainer {
 	 * @since 0.5.0
 	 */
 	public static FieldContainer from(VariableElement finder, ProcessorOptions options) {
-		//the parent always has a @Patch annotation
+		// the parent always has a @Patch annotation
 		Patch patchAnn = finder.getEnclosingElement().getAnnotation(Patch.class);
-		//the finder always has a @Find annotation
+		// the finder always has a @Find annotation
 		Find f = finder.getAnnotation(Find.class);
 
 		ClassContainer parent = ClassContainer.findOrFallback(
@@ -96,12 +96,11 @@ public class FieldContainer {
 		if(fieldType.toString().equals("java.lang.Object")) {
 			descriptor = null;
 		} else {
-			if(fieldType.getKind() != TypeKind.VOID && !fieldType.getKind().isPrimitive())
-				descriptor = //jank af but this is temporary anyway
-					"L" + ClassContainer.from(
-						f, Find::type, f.typeInner(), options
-					).data.nameMapped + ";";
-			else descriptor = descriptorFromType(fieldType, options.env);
+			if(fieldType.getKind() != TypeKind.VOID && !fieldType.getKind().isPrimitive()) {
+				descriptor = String.format("L%s;", ClassContainer.from(
+					f, Find::type, f.typeInner(), options
+				).data.nameMapped);
+			} else descriptor = descriptorFromType(fieldType, options.env);
 		}
 
 		return new FieldContainer(parent, name, descriptor, options);

@@ -32,13 +32,13 @@ public class ClassContainer {
 	public final TypeElement elem;
 
 	/**
-	 * Private constructor, called from {@link #from(Annotation, Function, String, ProcessorOptions)}.
+	 * Private constructor, called from {@link #from(Annotation, Function, String[], ProcessorOptions)}.
 	 * @param fqn the fully-qualified name of the target class
 	 * @param innerNames an array of Strings containing the path to the inner class, may be null
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
 	private ClassContainer(String fqn, String[] innerNames, ProcessorOptions options) {
-		//find and validate
+		// find and validate
 		TypeElement elem = options.env.getElementUtils().getTypeElement(fqn);
 
 		if(elem == null)
@@ -49,23 +49,11 @@ public class ClassContainer {
 		);
 
 		if(innerNames != null) {
+			boolean skip = false;
 			for(String inner : innerNames) {
-				if(inner == null) continue;
-				fqnBuilder.append("$").append(inner);
-				try {
-					int anonClassCounter = Integer.parseInt(inner);
-					//anonymous classes cannot be validated!
-					if(options.anonymousClassWarning)
-						options.env.getMessager().printMessage(
-							Diagnostic.Kind.WARNING,
-							String.format(
-								"Anonymous classes cannot be verified by the processor. The existence of %s$%s is not guaranteed!",
-								fqnBuilder, anonClassCounter
-							)
-						);
-					elem = null;
-					break;
-				} catch(NumberFormatException exc) {
+				if(inner != null) fqnBuilder.append('$').append(inner);
+				if(skip) continue;
+				if(shouldValidate(inner)) {
 					elem = elem
 						.getEnclosedElements()
 						.stream()
@@ -74,11 +62,24 @@ public class ClassContainer {
 						.filter(e -> e.getSimpleName().contentEquals(inner))
 						.findFirst()
 						.orElse(null);
+				} else {
+					options.env.getMessager().printMessage(
+						Diagnostic.Kind.WARNING,
+						String.format(
+							"Anonymous class %s$%s and its children cannot be verified by the processor!",
+							fqnBuilder,
+							inner
+						)
+					);
+					elem = null;
+					skip = true;
+					continue;
 				}
 				if(elem == null)
 					throw new TargetNotFoundException("class", inner);
 			}
 		}
+
 		this.data = getClassData(fqnBuilder.toString(), options.mapper);
 		this.elem = elem;
 	}
@@ -87,17 +88,22 @@ public class ClassContainer {
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param classFunction the annotation function returning the class
-	 * @param innerName a string containing the inner class name or nothing
+	 * @param innerNames a string containing the inner class name or nothing
 	 * @param options the {@link ProcessorOptions} to be used
 	 * @param <T> the type of the annotation carrying the information
 	 * @return the fully qualified name of the given class
 	 * @since 0.5.0
 	 */
-	public static <T extends Annotation> ClassContainer from(T ann, Function<T, Class<?>> classFunction, String innerName, ProcessorOptions options) {
-		String fqn;
-		String[] inner;
-		fqn = getTypeFromAnnotation(ann, classFunction, options.env).toString();
-		inner = innerName.equals("") ? null : innerName.split("//$");
+	public static <T extends Annotation> ClassContainer from(
+		T ann,
+		Function<T, Class<?>> classFunction,
+		String[] innerNames,
+		ProcessorOptions options
+	) {
+		String fqn = getTypeFromAnnotation(ann, classFunction, options.env).toString();
+		String[] inner = innerNames != null && innerNames.length != 0
+			? String.join("$", innerNames).split("\\$")
+			: null;
 		return new ClassContainer(fqn, inner, options);
 	}
 
@@ -123,8 +129,8 @@ public class ClassContainer {
 	 * @since 0.5.0
 	 */
 	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessorOptions options) {
-		if(f == null) return ClassContainer.from(p, Patch::value, p.innerName(), options);
-		ClassContainer cl = ClassContainer.from(f, Find::value, f.innerName(), options);
+		if(f == null) return ClassContainer.from(p, Patch::value, p.inner(), options);
+		ClassContainer cl = ClassContainer.from(f, Find::value, f.inner(), options);
 		return cl.data.name.equals("java/lang/Object") ? fallback : cl;
 	}
 }

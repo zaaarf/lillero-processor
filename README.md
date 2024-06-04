@@ -1,17 +1,22 @@
 # Lillero-processor
-Lillero-processor is an annotation processor made to simplify development of [Lillero](https://github.com/zaaarf/lillero) patches, minimising the amount of boilerplate code needed.
+Lillero-processor is an annotation processor made to simplify development of [Lillero](https://github.com/zaaarf/lillero) patches, minimising the
+amount of boilerplate code needed.
 
-An important note: to make things as easy as it is, the processor assumes that you have the code of the target available in your development environment. As of 0.6.0, it will not work otherwise.
+Please note that to work its magic, the processor needs the code of the target of your patches available in the compile
+time environment. If your build system does not allow that, you may want to use the library manually instead.
 
 ## Usage
-First things first, add the processor to your `build.gradle`:
+First things first, add the processor to your build system. The example shows Gradle, but any build system supporting
+Maven repositories should work:
 ```groovy
 dependencies {
 	implementation 'ftbsc.lll:processor:<whatever the latest version is>'
 	annotationProcessor 'ftbsc.lll:processor:<whatever the latest version is>'
 }
 ```
-Once it's done, you will be able to use Lillero without insane amounts of boilerplate. The processor works by generating new classes overriding the patches you write. The examples are abstract because stubs look better, but it should work even with concrete classes - in fact, modifiers are generally disregarded.
+Once it's done, you will be able to use Lillero without insane amounts of boilerplate. The processor works by generating
+new classes overriding the patches you write. The examples are abstract because stubs look better, but it should work
+even with concrete classes - in fact, modifiers are generally disregarded.
 
 The examples are about Minecraft, but you can use this with any Lillero-based project.
 
@@ -49,16 +54,27 @@ public abstract class SamplePatch {
 }
 ```
 
-The annotation `@Patch` specifies which class should be patched. `@Target` must be used on a stub with the same descriptor (return type and parameter types) and name as the target method. Its parameter `of` specifies who is referring to it. It follows that multiple patches may be made to different methods within a same class, as long as the injector name is always specified correctly. The `@Target` annotation is repeatable, and may therefore be used to have multiple injections on the same method.
+The annotation `@Patch` specifies which class should be patched. `@Target` must be used on a stub with the same
+descriptor (return type and parameter types) and name as the target method. Its parameter `of` specifies who is
+referring to it. It follows that multiple patches may be made to different methods within a same class, as long as the
+injector name is always specified correctly. The `@Target` annotation is repeatable, and may therefore be used to have
+multiple injections on the same method.
 
-If for any reason you don't want to check the full signature, but rather attempt a lookup by name only, simply add `strict = false` to your `@Target`. This is not recommended, as you may not always have the guarantee that you are the only one tampering with runtime code.
+If for any reason you don't want to check the full signature, but rather attempt a lookup by name only, simply add
+`strict = false` to your `@Target`. This is not recommended, as you may not always have the guarantee that you are the
+only one tampering with runtime code.
 
-You may find yourself not wanting to use the actual name of the target method in the stub. Maybe you have a name conflict, or maybe you are just trying to patch a constructor (`<init>`) or a static constructor (`<clinit>`), whose names you cannot type. Simply add `methodName = "name"` to your `@Target` annotation, and the specified name will overrule the stub's name.
+You may find yourself not wanting to use the actual name of the target method in the stub. Maybe you have a name
+conflict, or maybe you are just trying to patch a constructor (`<init>`) or a static constructor (`<clinit>`), whose
+names you cannot type. Simply add `methodName = "name"` to your `@Target` annotation, and the specified name will
+overrule the stub's name.
 
-It's interesting to note that the `ClassNode` in your injector method can be omitted if you don't use it (that is, most of them).
+Note that you can omit the `ClassNode` parameter in your injector method if you don't use it (which is most cases).
 
 ### Finders
-While patching, you may find yourself needing to refer to other methods and fields, both within your code and within the target. This can be simplified considerably through the `@Find` annotation. The behaviour of `@Find` differs considerably depending on what kind of element it is looking for. Let's see the three cases.
+While patching, you may find yourself needing to refer to other methods and fields, both within your code and within the
+target. This can be simplified considerably through the `@Find` annotation. The behaviour of `@Find` differs
+considerably depending on what kind of element it is looking for. Let's see the three cases.
 
 ```java
 @Find(SomeClass.class)
@@ -72,7 +88,8 @@ This is the simplest case. This finder will match any field named `fieldName` wi
 TypeProxy typeProxy;
 ```
 
-A `TypeProxy` is used to represent a class type. The `name` parameter, if given, will be ignored, and so will be the actual field name. The resulting `TypeProxy` will be a representation of `SomeClass`.
+A `TypeProxy` is used to represent a class type. The `name` parameter, if given, will be ignored, and so will be the
+actual field name. The resulting `TypeProxy` will be a representation of `SomeClass`.
 
 ```java
 @Find(SomeClass.class)
@@ -82,11 +99,16 @@ MethodProxy methodProxy;
 abstract void someMethod(int i, int j);
 ```
 
-MethodProxies need a stub to correctly match their target. Matching by name is also supported - either by setting the `strict` flag of the `@Target` annotation or by setting the `name` parameter in the `@Find` annotation - but is not recommended. The class specified within `@Find`, much like with fields, will be considered the parent class of the method you are looking for.
+MethodProxies need a stub to correctly match their target. Matching by name is also supported - either by setting the
+`strict` flag of the `@Target` annotation or by setting the `name` parameter in the `@Find` annotation - but is not
+recommended. The class specified within `@Find`, much like with fields, will be considered the parent class of the
+method you are looking for.
 
-Whenever the class is unspecified in a finder (except in TypeProxy's case, which is an error) it will be assumed to be the class containing the `@Find` annotation - that is, the patch class.
+Whenever the class is unspecified in a finder (except in TypeProxy's case, which is an error) it will be assumed to be
+the class containing the `@Find` annotation - that is, the patch class.
 
-Lillero provides three classes to use these in your injectors: `FieldProxyInsnNode`, `MethodProxyInsnNode` and `TypeProxyInsnNode`. Each wraps the equivalent [ObjectWeb ASM](https://asm.ow2.io/) `InsnNode`. For instance:
+Lillero provides three classes to use these in your injectors: `FieldProxyInsnNode`, `MethodProxyInsnNode` and
+`TypeProxyInsnNode`. Each wraps the equivalent [ObjectWeb ASM](https://asm.ow2.io/) `InsnNode`. For instance:
 
 ```java
 @Find(SomeClass.class)
@@ -103,23 +125,33 @@ public void inject(ClassNode clazz, MethodNode main) {
 Obviously, it's up to you to use the correct opcode. The processor can't read your mind (yet).
 
 ### Private Inner Classes
-You may find yourself needing to interact with a private inner class - which you can't reference explicitly by `Name.class`. The processor has your back, once again. Every annotation which tries to match a class (i.e. `@Patch` and `@Find`) also provides a `innerName` parameter. This allows you to specify the "unaccessible part" of the name, to be appended with a `$` in front of what is extracted from the Class object. In the unfortunate case of multiple nesting with private classes, just place any extra `$` yourself (i.e. `SampleClass$PrivateInnerFirst$InnerSecond` should be reached with a `@Patch(value = SampleClass.class, innerName = "PrivateInnerFirst$InnerSecond"`).
+You may find yourself needing to interact with a private inner class - which you can't reference explicitly by
+`Name.class`. The processor has your back, once again. Every annotation which tries to match a class (i.e. `@Patch` and
+`@Find`) also provides a `inner` parameter. This allows you to specify the "unaccessible part" of the name, to be
+appended with a `$` in front of what is extracted from the Class object. In the unfortunate case of multiple nesting
+with private classes, just place any extra `$` yourself (i.e. `SampleClass$PrivateInnerFirst$InnerSecond` should be
+reached with a `@Patch(value = SampleClass.class, inner = {"PrivateInnerFirst", "InnerSecond"}`).
 
 #### Anonymous classes
-Anonymous classes are trickier, because [they are apparently unavailable](https://stackoverflow.com/questions/75849759/how-to-find-an-anonymous-class-in-the-annotation-processing-environment) in the normal annotation processing environment. That means that, unlike with other classes, the processor cannot make sure that they exist, and it cannot easily extract information about their fields and methods.
+Anonymous classes are trickier, because [they are apparently unavailable](https://stackoverflow.com/questions/75849759/how-to-find-an-anonymous-class-in-the-annotation-processing-environment) in the normal annotation processing
+environment. That means that, unlike with other classes, the processor cannot make sure that they exist, and it cannot
+easily extract information about their fields and methods.
 
-Anonymous classes are numbered by the compiler in the order it meets them, starting from 1. The following rules apply to patching an anonymous class with the processor, as of version 0.6.0:
-* Use the compiler-assigned number as `innerName` parameter, next to the parent class.
+Anonymous classes are numbered by the compiler in the order it meets them, starting from 1. The following rules apply to
+patching an anonymous class with the processor, as of version 0.6.0:
+* Use the compiler-assigned number as `inner` parameter, next to the parent class.
 * Write any method stub normally.
-* Finders for anonymous class fields may be made, but their type has to be specified explicitly, unlike all others, by using the `type()` and `typeInner()` parameters.
-	- Local variables of the containing method may sometimes be accessible by an anonymous class. Make sure to use the `name` parameter of the finder appending the `val$` prefix, such as `val$actualName`.
-
-The extra `@Find` parameters (`type()` and `typeInner()`) are meant to be temporary, hacky workarounds until a better way is found. Expect them to change and be removed without notice. 
+* Finders for anonymous class fields may be made, but their type has to be specified explicitly, unlike all others, by 
+  using the `type()` and `typeInner()` parameters.
+	- Local variables of the containing method may sometimes be accessible by an anonymous class. Make sure to use the
+      `name` parameter of the finder appending the `val$` prefix, such as `val$actualName`.
 
 Most if not all of this (although I have not tested it) should apply to local classes as well.
 
 ### Hybrid setups
-Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to avoid conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
+Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these
+cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to 
+void conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
 
 ### Obfuscation support
 You may pass a mappings file to the processor by adding this to your `build.gradle`:
@@ -130,14 +162,19 @@ compileJava { //mappings for lillero-processor
 }
 ```
 
-This feature is in a very early stage, and currently only works with TSRG files (Minecraft MCP to SRG mappings). More formats will be added in the future - possibly as a separate library the processor will rely on.
+This feature is in a very early stage, and currently only works with TSRG files (Minecraft MCP to SRG mappings). More
+formats will be added in the future - possibly as a separate library the processor will rely on.
 
 ### Other processor arguments
-In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and `anonymousClassWarning`, to disable, respectively, warnings about bad practices in usage, and reminders of the unsafety of anonymous classes.
+In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
+`anonymousClassWarning`, to disable, respectively, warnings about bad practices in usage, and reminders of the unsafety
+of anonymous classes.
 
 ## Conclusions and Extras
-Since reaching version 0.5.0, the processor will hopefully be mostly stable. It has changed much in the past versions, but I am confident that we now found a solution capable of handling most, if not all, cases. 
+Since reaching version 0.5.0, the processor will hopefully be mostly stable. It has changed much in the past versions,
+but I am confident that we now found a solution capable of handling most, if not all, cases. 
 
-Though most of the original code is gone, you can still read my dev diary about developing its first version [here](https://fantabos.co/posts/zaaarf/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
+Though most of the original code is gone, you can still read my dev diary about developing its first version
+[here](https://fantabos.co/posts/zaaarf/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
 
 In conclusion, let me just say: happy patching!

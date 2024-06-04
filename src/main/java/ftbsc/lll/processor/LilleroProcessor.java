@@ -151,7 +151,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		//find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		ClassContainer targetClass = ClassContainer.from(
-			patchAnn, Patch::value, patchAnn.innerName(), this.getProcessorOptions()
+			patchAnn, Patch::value, patchAnn.inner(), this.getProcessorOptions()
 		);
 		//find package information
 		Element packageElement = cl.getEnclosingElement();

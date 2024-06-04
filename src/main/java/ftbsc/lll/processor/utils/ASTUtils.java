@@ -1,9 +1,6 @@
 package ftbsc.lll.processor.utils;
 
-import ftbsc.lll.exceptions.AmbiguousDefinitionException;
-import ftbsc.lll.exceptions.MappingNotFoundException;
-import ftbsc.lll.exceptions.NotAProxyException;
-import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.exceptions.*;
 import ftbsc.lll.mapper.utils.Mapper;
 import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.data.FieldData;
@@ -13,12 +10,14 @@ import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -148,7 +147,7 @@ public class ASTUtils {
 		t = env.getTypeUtils().erasure(t); //type erasure
 
 		StringBuilder desc = new StringBuilder();
-		//add array brackets
+		// add array brackets
 		while(t.getKind() == TypeKind.ARRAY) {
 			desc.append("[");
 			t = ((ArrayType) t).getComponentType();
@@ -261,7 +260,7 @@ public class ASTUtils {
 	 */
 	public static FieldData getFieldData(String parent, String name, Mapper mapper) {
 		try {
-			name = name.replace('.', '/'); //just in case
+			name = name.replace('.', '/'); // just in case
 			if(mapper != null)
 				return mapper.getFieldData(parent, name);
 		} catch(MappingNotFoundException ignored) {}
@@ -286,7 +285,7 @@ public class ASTUtils {
 		boolean strict, boolean field, ProcessingEnvironment env) {
 		if(parent.elem == null)
 			throw new TargetNotFoundException("parent class", parent.data.name);
-		//try to find by name
+		// try to find by name
 		List<Element> candidates = parent.elem.getEnclosedElements()
 			.stream()
 			.filter(e -> (field && e instanceof VariableElement) || e instanceof ExecutableElement)
@@ -304,8 +303,8 @@ public class ASTUtils {
 				"Found %d members named %s in class %s!", candidates.size(), name, parent.data.name));
 		} else {
 			if(field) {
-				//fields can verify the signature for extra safety
-				//but there can only be 1 field with a given name
+				// fields can verify the signature for extra safety
+				// but there can only be 1 field with a given name
 				if(!descriptorFromType(candidates.get(0).asType(), env).equals(descr))
 					throw new TargetNotFoundException("field", String.format(
 						"%s with descriptor %s", name, descr), parent.data.name);
@@ -348,7 +347,7 @@ public class ASTUtils {
 				continue;
 			if (env.getElementUtils().overrides(method, (ExecutableElement) elem, context)) {
 				method = (ExecutableElement) elem;
-				break; //found
+				break; // found
 			}
 		}
 
@@ -405,5 +404,27 @@ public class ASTUtils {
 			default:
 				throw new NotAProxyException(v.getEnclosingElement().getSimpleName().toString(), v.getSimpleName().toString());
 		}
+	}
+
+	/**
+	 * A pattern for efficiently recognising numeric strings.
+	 * @since 0.7.0
+	 */
+	private final static Pattern NUMERIC = Pattern.compile("^[0-9]+$");
+
+	/**
+	 * Checks whether a certain class name is valid, and whether the processor is able to validate
+	 * its existence.
+	 * @param name the name to validate
+	 * @return true if it's a valid class name, false if it's an anonymous class identifier
+	 * @throws InvalidClassNameException if an invalid name was provided
+	 * @since 0.7.0
+	 */
+	public static boolean shouldValidate(String name) throws InvalidClassNameException {
+		if(SourceVersion.isIdentifier(name) && !SourceVersion.isKeyword(name)) {
+			return true; // if it's a valid name, proceed
+		} else if(NUMERIC.matcher(name).matches()) {
+			return false;
+		} else throw new InvalidClassNameException(name);
 	}
 }

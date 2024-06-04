@@ -26,15 +26,13 @@ public @interface Find {
 	Class<?> value() default Object.class;
 
 	/**
-	 * This is the inner class name to append after a $ symbol to the already acquired
-	 * fully-qualified name. If it's a number instead of a valid name, the class will be
-	 * treated as an anonymous class, and will therefore be automatically unverified.
-	 * For a {@link TypeProxy}, this refers to the class itself rather than the parent.
+	 * For a {@link TypeProxy}, this refers to the target itself rather than its parent.
 	 * @return the name of the inner class that contains the target, defaults to empty
 	 *         string (not an inner class)
+	 * @see Patch#inner() for details
 	 * @since 0.5.0
 	 */
-	String innerName() default "";
+	String[] inner() default {};
 
 	/**
 	 * For a {@link FieldProxy}, this is the name of the field to find. If omitted,
@@ -42,7 +40,7 @@ public @interface Find {
 	 * For a {@link MethodProxy} it indicates an attempt to match by name only, with
 	 * this name. This will issue a warning unless warnings are disabled. It will fail
 	 * and throw an exception if multiple methods with that name are found in the
-	 * relevant class. It is generally recommended that you use a @link Target} stub
+	 * relevant class. It is generally recommended that you use a {@link Target} stub
 	 * for methods, as this can lead to unpredictable behaviour at runtime.
 	 * It will have no effect on a {@link TypeProxy}.
 	 * @return the name of the target, will default to the empty string (the name of
@@ -52,20 +50,16 @@ public @interface Find {
 	String name() default "";
 
 	/**
-	 * This overrules the type of a field. Only to be used in the case (such as fields of
+	 * This overrules a field type. Only to be used in the case (such as in fields of
 	 * anonymous classes) of fields whose parents cannot be reached at processing time.
 	 * @return a {@link Class} representing the type.
-	 * @deprecated This is only meant as a temporary solution until a better handling
-	 * 					   is implemented; only use this if strictly necessary as it may be
-	 * 					   removed or changed even across revisions.
 	 */
-	@Deprecated
 	Class<?> type() default Object.class;
 
 	/**
+	 * This is to be used in cases where private inner classes are used as parameters.
 	 * @return the inner class name to be used with {@link #type()}
-	 * @deprecated See {@link #type()}'s deprecation notice for more info.
+	 * @see Patch#inner() for details
 	 */
-	@Deprecated
-	String typeInner() default "";
+	String[] typeInner() default {};
 }
