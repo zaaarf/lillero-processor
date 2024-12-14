@@ -151,7 +151,7 @@ Most if not all of this (although I have not tested it) should apply to local cl
 ### Hybrid setups
 Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these
 cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to 
-void conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
+avoid conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
 
 ### Obfuscation support
 You may pass a mappings file to the processor by adding this to your `build.gradle`:
@@ -161,9 +161,7 @@ compileJava { //mappings for lillero-processor
 	options.compilerArgs << '-AmappingsFile=remote_url_or_local_path'
 }
 ```
-
-This feature is in a very early stage, and currently only works with TSRG files (Minecraft MCP to SRG mappings). More
-formats will be added in the future - possibly as a separate library the processor will rely on.
+This feature is powered by [Lillero-mapper](https://github.com/zaaarf/lillero-mapper). It supports multiple formats; my personal recommendation is `tinyv2`, but see the project's README for more information.
 
 ### Other processor arguments
 In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
