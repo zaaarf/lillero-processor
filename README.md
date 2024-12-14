@@ -175,6 +175,6 @@ Since reaching version 0.5.0, the processor will hopefully be mostly stable. It 
 but I am confident that we now found a solution capable of handling most, if not all, cases. 
 
 Though most of the original code is gone, you can still read my dev diary about developing its first version
-[here](https://fantabos.co/posts/zaaarf/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
+[here](https://zaaarf.foo/blog/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
 
 In conclusion, let me just say: happy patching!
