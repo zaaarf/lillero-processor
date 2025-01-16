@@ -65,7 +65,10 @@ public class MethodContainer {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, descriptor != null && strict,false, options.env
 			);
-			this.elem = bridge ? findSyntheticBridge(this.parent.elem, tmp, options.env) : tmp;
+
+			if(bridge) {
+				this.elem = findSyntheticBridge(tmp, options.env);
+			} else this.elem = tmp;
 			name = this.elem.getSimpleName().toString();
 			descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
@@ -78,7 +81,11 @@ public class MethodContainer {
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
 				options.mapper
 			);
+			System.out.println("parent: " + topParentData.name);
+			System.out.println("parentMapped: " + topParentData.nameMapped);
 			MethodData topData = getMethodData(topParentData.name, name, descriptor, options.mapper);
+			System.out.println("top method: " + topData.signature.name + " " + topData.signature.descriptor);
+			System.out.println("top method mapped: " + topData.nameMapped);
 			this.data = new MethodData(
 				parent.data,
 				topData.signature.name,

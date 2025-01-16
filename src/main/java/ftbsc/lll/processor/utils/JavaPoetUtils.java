@@ -51,10 +51,11 @@ public class JavaPoetUtils {
 		VariableElement var, ExecutableElement stub, Target t,
 		MethodSpec.Builder con, ProcessorOptions options) {
 		ProxyType type = getProxyType(var);
-		if(type != ProxyType.METHOD && type != ProxyType.FIELD)
-			return; //this method is irrelevant to everyone else
+		if(type != ProxyType.METHOD && type != ProxyType.FIELD) {
+			return; // this method is irrelevant to everyone else
+		}
 
-		//we need this stuff
+		// we need this stuff
 		Find f = var.getAnnotation(Find.class);
 		final boolean isMethod = type == ProxyType.METHOD;
 		final String builderName = var.getSimpleName().toString() + "Builder";
@@ -162,9 +163,9 @@ public class JavaPoetUtils {
 					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main")
 				.build());
 
-		if(inj.injector.getParameters().size() == 2)
+		if(inj.injector.getParameters().size() == 2) {
 			injectBuilder.addStatement("super.$L(clazz, main)", inj.injector.getSimpleName());
-		else injectBuilder.addStatement("super.$L(main)", inj.injector.getSimpleName());
+		} else injectBuilder.addStatement("super.$L(main)", inj.injector.getSimpleName());
 
 		return injectBuilder.build();
 	}

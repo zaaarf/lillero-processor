@@ -13,6 +13,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
+import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -88,8 +89,7 @@ public class ASTUtils {
 	 */
 	public static int mapModifiers(Collection<Modifier> modifiers) {
 		int i = 0;
-		for(Modifier m : modifiers)
-			i |= mapModifier(m);
+		for(Modifier m : modifiers) i |= mapModifier(m);
 		return i;
 	}
 
@@ -103,11 +103,13 @@ public class ASTUtils {
 	 * @since 0.3.0
 	 */
 	public static <T extends Annotation> TypeMirror getTypeFromAnnotation(
-		T ann, Function<T, Class<?>> classFunction, ProcessingEnvironment env) {
+		T ann,
+		Function<T, Class<?>> classFunction,
+		ProcessingEnvironment env
+	) {
 		try {
 			String fqn = classFunction.apply(ann).getCanonicalName();
-			if(fqn == null)
-				fqn = "";
+			if(fqn == null) fqn = "";
 			return env.getElementUtils().getTypeElement(fqn).asType();
 		} catch(MirroredTypeException e) {
 			return e.getTypeMirror();
@@ -222,8 +224,9 @@ public class ASTUtils {
 	public static ClassData getClassData(String name, Mapper mapper) {
 		try {
 			name = name.replace('.', '/'); // just in case
-			if(mapper != null)
+			if(mapper != null) {
 				return mapper.getClassData(name);
+			}
 		} catch(MappingNotFoundException ignored) {}
 		return new ClassData(name, name);
 	}
@@ -242,8 +245,9 @@ public class ASTUtils {
 	public static MethodData getMethodData(String parent, String name, String descriptor, Mapper mapper) {
 		try {
 			parent = parent.replace('.', '/'); // just in case
-			if(mapper != null)
+			if(mapper != null) {
 				return mapper.getMethodData(parent, name, descriptor);
+			}
 		} catch(MappingNotFoundException ignored) {}
 		return new MethodData(getClassData(name, mapper), name, name, descriptor);
 	}
@@ -261,8 +265,9 @@ public class ASTUtils {
 	public static FieldData getFieldData(String parent, String name, Mapper mapper) {
 		try {
 			name = name.replace('.', '/'); // just in case
-			if(mapper != null)
+			if(mapper != null) {
 				return mapper.getFieldData(parent, name);
+			}
 		} catch(MappingNotFoundException ignored) {}
 		return new FieldData(getClassData(name, mapper), name, name);
 	}
@@ -281,10 +286,17 @@ public class ASTUtils {
 	 * @since 0.3.0
 	 */
 	public static Element findMember(
-		ClassContainer parent, String name, String descr,
-		boolean strict, boolean field, ProcessingEnvironment env) {
-		if(parent.elem == null)
+		ClassContainer parent,
+		String name,
+		String descr,
+		boolean strict,
+		boolean field,
+		ProcessingEnvironment env
+	) {
+		if(parent.elem == null) {
 			throw new TargetNotFoundException("parent class", parent.data.name);
+		}
+
 		// try to find by name
 		List<Element> candidates = parent.elem.getEnclosedElements()
 			.stream()
@@ -292,37 +304,59 @@ public class ASTUtils {
 			.filter(e -> e.getSimpleName().contentEquals(name))
 			.collect(Collectors.toList());
 
-		if(candidates.isEmpty())
+		if(candidates.isEmpty()) {
 			throw new TargetNotFoundException(field ? "field" : "method", name, parent.data.name);
+		}
 
-		if(candidates.size() == 1 && (!strict || descr == null))
+		if(candidates.size() == 1 && (!strict || descr == null)) {
 			return candidates.get(0);
+		}
 
 		if(descr == null) {
 			throw new AmbiguousDefinitionException(String.format(
-				"Found %d members named %s in class %s!", candidates.size(), name, parent.data.name));
+				"Found %d members named %s in class %s!",
+				candidates.size(),
+				name,
+				parent.data.name
+			));
 		} else {
 			if(field) {
 				// fields can verify the signature for extra safety
 				// but there can only be 1 field with a given name
-				if(!descriptorFromType(candidates.get(0).asType(), env).equals(descr))
-					throw new TargetNotFoundException("field", String.format(
-						"%s with descriptor %s", name, descr), parent.data.name);
+				if(!descriptorFromType(candidates.get(0).asType(), env).equals(descr)) {
+					throw new TargetNotFoundException(
+						"field",
+						String.format("%s with descriptor %s", name, descr),
+						parent.data.name
+					);
+				}
 			} else {
 				candidates = candidates.stream()
 					.map(e -> (ExecutableElement) e)
 					.filter(strict
 						? c -> descr.equals(descriptorFromExecutableElement(c, env))
 						: c -> descr.split("\\)")[0].equalsIgnoreCase(
-							descriptorFromExecutableElement(c, env).split("\\)")[0])
+							descriptorFromExecutableElement(c, env).split("\\)")[0]
+						)
 					).collect(Collectors.toList());
 			}
-			if(candidates.isEmpty())
-				throw new TargetNotFoundException("method", String.format(
-					"%s %s", name, descr), parent.data.name);
-			if(candidates.size() > 1)
+
+			if(candidates.isEmpty()) {
+				throw new TargetNotFoundException(
+					"method",
+					String.format("%s %s", name, descr),
+					parent.data.name
+				);
+			}
+
+			if(candidates.size() > 1) {
 				throw new AmbiguousDefinitionException(String.format(
-					"Found %d methods named %s in class %s!", candidates.size(), name, parent.data.name));
+					"Found %d methods named %s in class %s!",
+					candidates.size(),
+					name,
+					parent.data.name
+				));
+			}
 			return candidates.get(0);
 		}
 	}
@@ -338,23 +372,44 @@ public class ASTUtils {
 	 * @since 0.5.2
 	 */
 	public static ExecutableElement findOverloadedMethod(
-		TypeElement context, ExecutableElement method, ProcessingEnvironment env) {
-		if (context.getSuperclass().getKind() == TypeKind.NONE)
-			return method;
-
-		for (Element elem : context.getEnclosedElements()) {
-			if (elem.getKind() != ElementKind.METHOD)
-				continue;
-			if (env.getElementUtils().overrides(method, (ExecutableElement) elem, context)) {
+		TypeElement context,
+		ExecutableElement method,
+		ProcessingEnvironment env
+	) {
+		for(Element elem : context.getEnclosedElements()) {
+			if(elem.getKind() != ElementKind.METHOD) continue;
+			if(env.getElementUtils().overrides(method, (ExecutableElement) elem, context)) {
 				method = (ExecutableElement) elem;
 				break; // found
 			}
 		}
 
-		return findOverloadedMethod(
-			(TypeElement) env.getTypeUtils().asElement(context.getSuperclass()),
-			method, env
-		);
+		if(context.getSuperclass().getKind() == TypeKind.NONE) {
+			return method;
+		} else {
+			ExecutableElement found = findOverloadedMethod(
+				(TypeElement) env.getTypeUtils().asElement(context.getSuperclass()),
+				method,
+				env
+			);
+
+			// if the superclass tree did not find anything, try the interfaces
+			if(found.equals(method)) {
+				for(TypeMirror i : context.getInterfaces()) {
+					ExecutableElement interfaceFound = findOverloadedMethod(
+						(TypeElement) env.getTypeUtils().asElement(i),
+						method,
+						env
+					);
+
+					if(!interfaceFound.equals(found)) {
+						return interfaceFound;
+					}
+				}
+			}
+
+			return found;
+		}
 	}
 
 	/**
@@ -362,24 +417,43 @@ public class ASTUtils {
 	 * methods. A "bridge" only exists in cases where type erasure is involved (i.e. when the
 	 * method being overridden uses a generic parameter that is not preserved in the overriding
 	 * method).
-	 * @param context the {@link TypeElement} representing the parent class
-	 * @param method an {@link ExecutableElement} stub representing the overloading method
+	 * @param method an {@link ExecutableElement} the (potentially) bridged method
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @return the "bridge"
+	 * @return the "bridge", or null if not found
 	 * @throws TargetNotFoundException if the method in question was not overriding anything, or
 	 * 																 if the method it was overriding does not require a bridge
 	 * @since 0.5.2
 	 */
 	public static ExecutableElement findSyntheticBridge(
-		TypeElement context, ExecutableElement method, ProcessingEnvironment env) throws TargetNotFoundException {
-		ExecutableElement overridding = findOverloadedMethod(context, method, env);
-		if(descriptorFromExecutableElement(overridding, env).equals(descriptorFromExecutableElement(method, env)))
-			throw new TargetNotFoundException(
-				"bridge method for",
-				overridding.getSimpleName().toString(),
-				context.getQualifiedName().toString()
-			);
-		else return overridding;
+		ExecutableElement method,
+		ProcessingEnvironment env
+	) throws TargetNotFoundException {
+		Types typeUtils = env.getTypeUtils();
+		TypeElement parent = (TypeElement) method.getEnclosingElement();
+		for(Element element : parent.getEnclosedElements()) {
+			if(!(element instanceof ExecutableElement)) continue;
+			ExecutableElement cursor = (ExecutableElement) element;
+			if(cursor.equals(method)) continue;
+
+			if(!cursor.getSimpleName().contentEquals(method.getSimpleName())) {
+				continue;
+			}
+
+			ExecutableType methodType = (ExecutableType) method.asType();
+			ExecutableType cursorType = (ExecutableType) cursor.asType();
+			if(typeUtils.isSubsignature(
+				(ExecutableType) typeUtils.erasure(cursorType),
+				(ExecutableType) typeUtils.erasure(methodType)
+				)) {
+				return method;
+			}
+		}
+
+		throw new TargetNotFoundException(
+			"bridge method for",
+			method.getSimpleName().toString(),
+			parent.getQualifiedName().toString()
+		);
 	}
 
 	/**
