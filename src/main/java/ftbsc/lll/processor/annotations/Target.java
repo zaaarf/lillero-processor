@@ -61,6 +61,7 @@ public @interface Target {
 	 * In some particularly elaborate cases of inheritance with type erasure, you may want
 	 * to explicitly specify the top-level parent with {@link Overridden} or, if your mappings
 	 * are specific enough, to merely disable this.
+	 * @return whether to try and match the top-level parent
 	 * @since 0.8.0
 	 */
 	boolean lookForParent() default true;
