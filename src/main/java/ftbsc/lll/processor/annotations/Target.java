@@ -55,6 +55,17 @@ public @interface Target {
 	boolean bridge() default false;
 
 	/**
+	 * When set to true, tells the processor to try and match the top-level parent of
+	 * this method. This is the behaviour you want in *most* cases, as it will be either
+	 * irrelevant or beneficial.
+	 * In some particularly elaborate cases of inheritance with type erasure, you may want
+	 * to explicitly specify the top-level parent with {@link Overridden} or, if your mappings
+	 * are specific enough, to merely disable this.
+	 * @since 0.8.0
+	 */
+	boolean lookForParent() default true;
+
+	/**
 	 * Used to support {@link Target} as a {@link Repeatable} annotation.
 	 * @since 0.6.1
 	 */

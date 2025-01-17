@@ -58,6 +58,7 @@ public class MethodContainer {
 	 * @param descriptor the descriptor of the target method
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
+	 * @param lookForParent whether the top-level parent of @Override should be used for mapping instead
 	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
@@ -67,6 +68,7 @@ public class MethodContainer {
 		String descriptor,
 		boolean strict,
 		boolean bridge,
+		boolean lookForParent,
 		ExecutableElement overriddenStub,
 		ProcessorOptions options
 	) {
@@ -90,7 +92,7 @@ public class MethodContainer {
 		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper);
 		// some mapping formats omit methods if they are overriding a parent's method
 		// since there is no drawback but efficiency, let's use the top parent's name for that (when possible)
-		if(this.parent.elem != null) {
+		if(lookForParent && this.parent.elem != null) {
 			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
 			ExecutableElement top;
 			if(overriddenStub != null) {
@@ -151,15 +153,26 @@ public class MethodContainer {
 			ClassContainer.from((TypeElement) stub.getEnclosingElement(), options), patchAnn, f, options
 		);
 		String name = !t.methodName().isEmpty()
-			?	t.methodName() //name was specified in target
+			?	t.methodName() // name was specified in target
 			: stub.getSimpleName().toString();
 		String descriptor = t.strict()
 			? descriptorFromExecutableElement(stub, options.env)
 			: null;
 
-		ExecutableElement overriddenStub = findOverriddenStub(stub);
+		ExecutableElement overriddenStub = t.lookForParent()
+			? findOverriddenStub(stub)
+			: null;
 
-		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), overriddenStub, options);
+		return new MethodContainer(
+			parent,
+			name,
+			descriptor,
+			t.strict(),
+			t.bridge(),
+			t.lookForParent(),
+			overriddenStub,
+			options
+		);
 	}
 
 	/**
