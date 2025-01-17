@@ -138,7 +138,7 @@ environment. That means that, unlike with other classes, the processor cannot ma
 easily extract information about their fields and methods.
 
 Anonymous classes are numbered by the compiler in the order it meets them, starting from 1. The following rules apply to
-patching an anonymous class with the processor, as of version 0.6.0:
+patching an anonymous class with the processor:
 * Use the compiler-assigned number as `inner` parameter, next to the parent class.
 * Write any method stub normally.
 * Finders for anonymous class fields may be made, but their type has to be specified explicitly, unlike all others, by 
@@ -161,7 +161,32 @@ compileJava { //mappings for lillero-processor
 	options.compilerArgs << '-AmappingsFile=remote_url_or_local_path'
 }
 ```
-This feature is powered by [Lillero-mapper](https://github.com/zaaarf/lillero-mapper). It supports multiple formats; my personal recommendation is `tinyv2`, but see the project's README for more information.
+This feature is powered by [Lillero-mapper](https://github.com/zaaarf/lillero-mapper). It supports multiple formats;
+my personal recommendation is `tinyv2`, but see the project's README for more information.
+
+#### Limitations
+Many mapping formats like to "trim" their contents by not repeating information about overriding methods. Generally,
+Lillero will *attempt* to find its way up to the top-level method, every time, to compensate for that.
+
+However, the inherent limitations of the AST environment are such that the processor *will* fail to find its way up
+the tree if type erasure is involved. The actual overriding methods will be synthetic, but the processor can't know
+anything about them since it operates before the compiler creates them. To mitigate this, you can use the annotation
+`@Overridden`, which allows the user to write a stub for the top-level parent (thus specifying the signature of the
+method which will actually carry the obfuscation information).
+
+```java
+@Overridden(parent = IGenericInterface.class)
+abstract<T extends SomeClass> void someMethod(T input);
+
+@Target(of = "someInjector")
+abstract<T extends SubClassOfSomeClass> void someMethod(T input);
+```
+
+`@Overidden` will know what `@Target` stuff it's aimed at by the name; if that proves not enough for your case, a `by`
+field allows you to customize that (obviously, combined with `@Target`'s `methodName`, which it will **ignore**). It
+has an obligatory `parent` field, and a number of optional ones that you should already be familiar with.
+
+The base will be unaffected by `@Overridden` for all purposes except obfuscation of the name.
 
 ### Other processor arguments
 In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
@@ -169,8 +194,10 @@ In the same way you pass mappings, you may pass `false` or `0` to the boolean ar
 of anonymous classes.
 
 ## Conclusions and Extras
-Since reaching version 0.5.0, the processor will hopefully be mostly stable. It has changed much in the past versions,
-but I am confident that we now found a solution capable of handling most, if not all, cases. 
+The processor's API should remain mostly stable, unless glaring issues are found, at least until version `1.0.0`.
+It has changed much in the past versions, but I am confident that the current design is capable of handling most,
+if not all, problems. More features may be added to deal with new cases that come up, but existing features should
+remain stable and largely unchanged (from the outside, at least).
 
 Though most of the original code is gone, you can still read my dev diary about developing its first version
 [here](https://zaaarf.foo/blog/to-kill-a-boilerplate/) if you are curious about the initial ideas behind it.
