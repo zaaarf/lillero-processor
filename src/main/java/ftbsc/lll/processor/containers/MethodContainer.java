@@ -6,12 +6,17 @@ import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.utils.MappingUtils;
 import ftbsc.lll.mapper.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
+import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
 
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.QualifiedNameable;
 import javax.lang.model.element.TypeElement;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.utils.ASTUtils.*;
 
@@ -53,14 +58,23 @@ public class MethodContainer {
 	 * @param descriptor the descriptor of the target method
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
+	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	private MethodContainer(ClassContainer parent, String name, String descriptor, boolean strict, boolean bridge, ProcessorOptions options) {
+	private MethodContainer(
+		ClassContainer parent,
+		String name,
+		String descriptor,
+		boolean strict,
+		boolean bridge,
+		ExecutableElement overriddenStub,
+		ProcessorOptions options
+	) {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
-			if(descriptor == null)
+			if(descriptor == null) {
 				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
-			this.elem = null;
+			} else this.elem = null;
 		} else {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, descriptor != null && strict,false, options.env
@@ -73,26 +87,42 @@ public class MethodContainer {
 			descriptor = descriptorFromExecutableElement(this.elem, options.env);
 		}
 
+		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper);
 		// some mapping formats omit methods if they are overriding a parent's method
 		// since there is no drawback but efficiency, let's use the top parent's name for that (when possible)
 		if(this.parent.elem != null) {
-			ExecutableElement top = findOverloadedMethod(this.parent.elem, this.elem, options.env);
+			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
+			ExecutableElement top;
+			if(overriddenStub != null) {
+				Overridden o = overriddenStub.getAnnotation(Overridden.class);
+				top = (ExecutableElement) findMember(
+					ClassContainer.from(o, Overridden::parent, o.parentInner(), options),
+					overriddenStub.getSimpleName().toString(),
+					o.strict() ? descriptorFromExecutableElement(overriddenStub, options.env) : null,
+					o.strict(),
+					false,
+					options.env
+				);
+			} else top = findOverloadedMethod(this.parent.elem, this.elem, options.env);
 			ClassData topParentData = getClassData(
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
 				options.mapper
 			);
-			System.out.println("parent: " + topParentData.name);
-			System.out.println("parentMapped: " + topParentData.nameMapped);
-			MethodData topData = getMethodData(topParentData.name, name, descriptor, options.mapper);
-			System.out.println("top method: " + topData.signature.name + " " + topData.signature.descriptor);
-			System.out.println("top method mapped: " + topData.nameMapped);
+
+			MethodData topData = getMethodData(
+				topParentData.name,
+				top.getSimpleName().toString(),
+				descriptorFromExecutableElement(top, options.env),
+				options.mapper
+			);
+
 			this.data = new MethodData(
 				parent.data,
-				topData.signature.name,
+				baseData.signature.name,
 				topData.nameMapped,
-				topData.signature.descriptor
+				baseData.signature.descriptor
 			);
-		} else this.data = getMethodData(parent.data.name, name, descriptor, options.mapper);
+		} else this.data = baseData;
 
 		this.descriptorObf = options.mapper == null ? this.data.signature.descriptor
 			: MappingUtils.mapMethodDescriptor(this.data.signature.descriptor, options.mapper, false);
@@ -109,8 +139,13 @@ public class MethodContainer {
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static MethodContainer from(ExecutableElement stub, Target t, Find f, ProcessorOptions options) {
-		//the parent always has a @Patch annotation
+	public static MethodContainer from(
+		ExecutableElement stub,
+		Target t,
+		Find f,
+		ProcessorOptions options
+	) {
+		// the parent always has a @Patch annotation
 		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
 		ClassContainer parent = ClassContainer.findOrFallback(
 			ClassContainer.from((TypeElement) stub.getEnclosingElement(), options), patchAnn, f, options
@@ -122,6 +157,42 @@ public class MethodContainer {
 			? descriptorFromExecutableElement(stub, options.env)
 			: null;
 
-		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), options);
+		ExecutableElement overriddenStub = findOverriddenStub(stub);
+
+		return new MethodContainer(parent, name, descriptor, t.strict(), t.bridge(), overriddenStub, options);
+	}
+
+	/**
+	 * Find the associated {@link Overridden} stub, if present.
+	 * @param stub the stub to look for info
+	 * @return the {@link Overridden} stub, or null if not found
+	 */
+	public static ExecutableElement findOverriddenStub(ExecutableElement stub) {
+		List<ExecutableElement> elements = stub.getEnclosingElement().getEnclosedElements().stream()
+			.filter(e -> e instanceof ExecutableElement)
+			.map(e -> (ExecutableElement) e)
+			.filter(e -> {
+				if(e.getParameters().size() != stub.getParameters().size()) return false;
+				Overridden ann = e.getAnnotation(Overridden.class);
+				if(ann == null) return false;
+
+				CharSequence nameLookingFor = ann.by().isEmpty()
+					? stub.getSimpleName()
+					: ann.by();
+				return stub.getSimpleName().equals(nameLookingFor);
+			}).collect(Collectors.toList());
+
+		switch(elements.size()) {
+			case 0:
+				return null;
+			case 1:
+				return elements.get(0);
+			default:
+				throw new AmbiguousDefinitionException(String.format(
+					"Found multiple @Overridden methods for stub %s.%s!",
+					((QualifiedNameable) stub.getEnclosingElement()).getQualifiedName().toString(),
+					stub.getSimpleName().toString()
+				));
+		}
 	}
 }

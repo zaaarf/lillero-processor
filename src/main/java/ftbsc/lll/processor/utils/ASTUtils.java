@@ -13,7 +13,6 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
-import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -249,6 +248,7 @@ public class ASTUtils {
 				return mapper.getMethodData(parent, name, descriptor);
 			}
 		} catch(MappingNotFoundException ignored) {}
+
 		return new MethodData(getClassData(name, mapper), name, name, descriptor);
 	}
 
@@ -378,7 +378,11 @@ public class ASTUtils {
 	) {
 		for(Element elem : context.getEnclosedElements()) {
 			if(elem.getKind() != ElementKind.METHOD) continue;
-			if(env.getElementUtils().overrides(method, (ExecutableElement) elem, context)) {
+			if(env.getElementUtils().overrides(
+				method,
+				(ExecutableElement) elem,
+				(TypeElement) method.getEnclosingElement()
+			)) {
 				method = (ExecutableElement) elem;
 				break; // found
 			}
@@ -428,32 +432,15 @@ public class ASTUtils {
 		ExecutableElement method,
 		ProcessingEnvironment env
 	) throws TargetNotFoundException {
-		Types typeUtils = env.getTypeUtils();
 		TypeElement parent = (TypeElement) method.getEnclosingElement();
-		for(Element element : parent.getEnclosedElements()) {
-			if(!(element instanceof ExecutableElement)) continue;
-			ExecutableElement cursor = (ExecutableElement) element;
-			if(cursor.equals(method)) continue;
-
-			if(!cursor.getSimpleName().contentEquals(method.getSimpleName())) {
-				continue;
-			}
-
-			ExecutableType methodType = (ExecutableType) method.asType();
-			ExecutableType cursorType = (ExecutableType) cursor.asType();
-			if(typeUtils.isSubsignature(
-				(ExecutableType) typeUtils.erasure(cursorType),
-				(ExecutableType) typeUtils.erasure(methodType)
-				)) {
-				return method;
-			}
-		}
-
-		throw new TargetNotFoundException(
-			"bridge method for",
-			method.getSimpleName().toString(),
-			parent.getQualifiedName().toString()
-		);
+		ExecutableElement overriding = findOverloadedMethod(parent, method, env);
+		if(descriptorFromExecutableElement(overriding, env).equals(descriptorFromExecutableElement(method, env)))
+			throw new TargetNotFoundException(
+				"bridge method for",
+				overriding.getSimpleName().toString(),
+				parent.getQualifiedName().toString()
+			);
+		else return overriding;
 	}
 
 	/**
