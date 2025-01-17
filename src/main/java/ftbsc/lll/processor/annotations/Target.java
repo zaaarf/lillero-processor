@@ -63,7 +63,12 @@ public @interface Target {
 	 * are specific enough, to merely disable this.
 	 * @return whether to try and match the top-level parent
 	 * @since 0.8.0
+	 * @deprecated This is meant as a temporary workaround and will be removed in an upcoming
+	 *             patch as better logic for parent-lookup in mappings is introduced. When that
+	 *             happens, setting this to false will be rendered moot, so you can just remove
+	 *             this from your annotations.
 	 */
+	@Deprecated
 	boolean lookForParent() default true;
 
 	/**
