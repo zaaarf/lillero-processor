@@ -12,8 +12,11 @@ import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.FieldProxy;
 import ftbsc.lll.proxies.impl.MethodProxy;
 
+import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashSet;
 
 import static ftbsc.lll.processor.utils.ASTUtils.getProxyType;
@@ -186,5 +189,26 @@ public class JavaPoetUtils {
 			name.insert(0, cl.getSimpleName());
 		}
 		return name.toString();
+	}
+
+	/**
+	 * Writes a Java source file from a JavaPoet spec.
+	 * @param filer the processing environment's {@link Filer}
+	 * @param pkg the package to output this to
+	 * @param name the simple name of the class
+	 * @param spec the {@link TypeSpec} for it
+	 * @return the fully qualified name of the written class
+	 * @since 0.8.2
+	 */
+	public static String writeClass(Filer filer, String pkg, String name, TypeSpec spec) {
+		String fqn = String.format("%s.%s", pkg, name);
+		JavaFile javaFile = JavaFile.builder(pkg, spec).build();
+		try(PrintWriter out = new PrintWriter(filer.createSourceFile(fqn).openWriter())) {
+			javaFile.writeTo(out);
+		} catch(IOException e) {
+			throw new RuntimeException(e);
+		}
+
+		return fqn;
 	}
 }

@@ -20,8 +20,11 @@ public class ProcessorOptions {
 	 * A {@link Set} of options currently supported by the processor.
 	 */
 	public static final Set<String> SUPPORTED = new HashSet<>(Arrays.asList(
-		"mappingsFile", "anonymousClassWarning", "obfuscateInjectorMetadata",
-		"noServiceProvider"
+		"mappingsFile",
+		"anonymousClassWarning",
+		"obfuscateInjectorMetadata",
+		"noServiceProvider",
+		"fakeMixin" // lillero-mixin support
 	));
 
 	/**
@@ -53,6 +56,12 @@ public class ProcessorOptions {
 	public final boolean noServiceProvider;
 
 	/**
+	 * The fully qualified name of the fake mixin class to generate.
+	 * No fake mixin class will be generated when this is null.
+	 */
+	public final String fakeMixin;
+
+	/**
 	 * The public constructor, parses and stores all given arguments.
 	 * @param env the environment the processor is working in
 	 */
@@ -66,6 +75,7 @@ public class ProcessorOptions {
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
+		this.fakeMixin = env.getOptions().get("fakeMixin");
 	}
 
 	/**

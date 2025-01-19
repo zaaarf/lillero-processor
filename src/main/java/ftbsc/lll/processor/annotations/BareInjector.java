@@ -1,6 +1,7 @@
 package ftbsc.lll.processor.annotations;
 
 import ftbsc.lll.IInjector;
+import ftbsc.lll.processor.ProcessorOptions;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -11,6 +12,8 @@ import java.lang.annotation.RetentionPolicy;
  * (META-INF/services/ftbsc.lll.IInjector) without actually processing it. This can
  * be used to mix in a same project regular {@link IInjector}s and those generated
  * by the processor.
+ * To make this work with the {@link ProcessorOptions#fakeMixin} option, add to the
+ * class a {@link Patch} annotation specifying the details.
  * @since 0.6.1
  */
 @Retention(RetentionPolicy.CLASS)

@@ -1,9 +1,6 @@
 package ftbsc.lll.processor;
 
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
 import ftbsc.lll.exceptions.AmbiguousDefinitionException;
 import ftbsc.lll.exceptions.OrphanElementException;
@@ -21,7 +18,6 @@ import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
-import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -42,6 +38,13 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * of the generated injector files.
 	 */
 	private final Set<String> injectors = new HashSet<>();
+
+
+	/**
+	 * A {@link Set} of {@link ClassName}s representing the classes that
+	 * are being targeted.
+	 */
+	private final Set<ClassName> targets = new HashSet<>();
 
 	/**
 	 * An object representing the various options passed to the processor.
@@ -84,31 +87,50 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @see LilleroProcessor#isValidInjector(TypeElement)
 	 * @param annotations the annotation types requested to be processed
 	 * @param roundEnv environment for information about the current and prior round
-	 * @return whether or not the set of annotation types are claimed by this processor
+	 * @return whether the set of annotation types are claimed by this processor
 	 */
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		for(TypeElement annotation : annotations) {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
-				roundEnv.getElementsAnnotatedWith(annotation)
-					.stream()
-					.map(e -> (TypeElement) e)
-					.filter(this::isValidInjector)
-					.forEach(this::generateClasses);
+				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
+					TypeElement type = (TypeElement) e;
+					if(e.getAnnotation(BareInjector.class) == null && this.isValidInjector(type)) {
+						this.generateClasses(type);
+					}
+
+					Patch ann = e.getAnnotation(Patch.class);
+					TypeMirror value = getTypeFromAnnotation(ann, Patch::value, this.processingEnv);
+					ClassName name = ClassName.get((TypeElement) this.processingEnv.getTypeUtils().asElement(value));
+					for(String inner : ann.inner()) {
+						name = name.nestedClass(inner);
+					}
+					this.targets.add(name);
+				}
 			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
 				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
-					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType))
-						this.injectors.add(((TypeElement) e).getQualifiedName().toString());
-					else this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, String.format(
-						"Class %s annotated with @RegisterBareInjector is not an instance of IInjector, skipping...",
-						((TypeElement) e).getQualifiedName().toString()
-					));
+					TypeElement type = (TypeElement) e;
+					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType)) {
+						this.injectors.add(type.getQualifiedName().toString());
+					} else {
+						this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, String.format(
+							"Class %s annotated with @BareInjector is not an instance of IInjector, skipping...",
+							type.getQualifiedName().toString()
+						));
+					}
 				}
 			}
 		}
-		if (!this.getProcessorOptions().noServiceProvider && !this.injectors.isEmpty()) {
-			generateServiceProvider();
+
+		ProcessorOptions options = this.getProcessorOptions();
+
+		if(options.fakeMixin != null && !this.injectors.isEmpty()) {
+			this.generateFakeMixinClass(options.fakeMixin);
+		}
+
+		if(!options.noServiceProvider && !this.injectors.isEmpty()) {
+			this.generateServiceProvider();
 			return true;
 		} else return false;
 	}
@@ -308,20 +330,36 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
 
-			JavaFile javaFile = JavaFile.builder(packageName, injectorClass).build();
-			String injectorClassName = String.format("%s.%s", packageName, injName);
-
-			try {
-				JavaFileObject injectorFile = processingEnv.getFiler().createSourceFile(injectorClassName);
-				PrintWriter out = new PrintWriter(injectorFile.openWriter());
-				javaFile.writeTo(out);
-				out.close();
-			} catch(IOException e) {
-				throw new RuntimeException(e);
-			}
-
-			this.injectors.add(injectorClassName);
+			this.injectors.add(writeClass(this.processingEnv.getFiler(), packageName, injName, injectorClass));
 		}
+	}
+
+	/**
+	 * Generates a fake no-op Mixin to ensure that all the classes that need transformations
+	 * are registered to require them in Mixin environments.
+	 * @param fqn the fully-qualified name of the class
+	 * @since 0.8.2
+	 */
+	public void generateFakeMixinClass(String fqn) {
+		int lastPeriod = fqn.lastIndexOf('.');
+		String pkg = fqn.substring(0, Math.max(0, lastPeriod));
+		String clazz = fqn.substring(lastPeriod + 1);
+
+		AnnotationSpec.Builder mixinAnn = AnnotationSpec.builder(ClassName.get(
+			"org.spongepowered.asm.mixin",
+			"Mixin"
+		));
+
+		for(ClassName targetName : this.targets) {
+			mixinAnn.addMember("value", "$T.class", targetName);
+		}
+
+		TypeSpec spec = TypeSpec.classBuilder(clazz)
+			.addModifiers(Modifier.PUBLIC)
+			.addAnnotation(mixinAnn.build())
+			.build();
+
+		writeClass(this.processingEnv.getFiler(), pkg, clazz, spec);
 	}
 
 	/**
@@ -329,10 +367,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	private void generateServiceProvider() {
 		try {
-			FileObject serviceProvider =
-				processingEnv.getFiler().createResource(
-					StandardLocation.CLASS_OUTPUT, "", "META-INF/services/ftbsc.lll.IInjector"
-				);
+			FileObject serviceProvider = this.processingEnv.getFiler().createResource(
+				StandardLocation.CLASS_OUTPUT,
+				"",
+				"META-INF/services/ftbsc.lll.IInjector"
+			);
 			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
 			this.injectors.forEach(out::println);
 			this.injectors.clear();
