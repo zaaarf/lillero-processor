@@ -169,4 +169,22 @@ public class JavaPoetUtils {
 
 		return injectBuilder.build();
 	}
+
+	/**
+	 * Generates the "real" class name for a {@link TypeElement}. The "real" class name
+	 * is identical to the simple name for normal classes, and is the result of recursively
+	 * joining the simple name with the parent's with "$" for inner classes.
+	 * @param cl the class to generate it for
+	 * @return the real class name
+	 * @since 0.8.1
+	 */
+	public static String generateRealClassName(TypeElement cl) {
+		StringBuilder name = new StringBuilder(cl.getSimpleName().toString());
+		while(cl.getEnclosingElement() instanceof TypeElement) {
+			cl = (TypeElement) cl.getEnclosingElement();
+			name.insert(0, '$');
+			name.insert(0, cl.getSimpleName());
+		}
+		return name.toString();
+	}
 }

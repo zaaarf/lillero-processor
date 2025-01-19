@@ -259,7 +259,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						ExecutableElement injector = injectorCandidates.get(0);
 						matchedInjectors.add(injector);
 						toGenerate.put(
-							String.format("%sInjector%d", cl.getSimpleName(), iterationNumber),
+							String.format("%sInjector%d", generateRealClassName(cl), iterationNumber),
 							new InjectorInfo(injector, tg, targetAnn, this.getProcessorOptions())
 						);
 						iterationNumber++; //increment is only used by injectors
