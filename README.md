@@ -151,7 +151,7 @@ Most if not all of this (although I have not tested it) should apply to local cl
 ### Hybrid setups
 Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these
 cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to 
-avoid conflicts. Simply add the annotation `@RegisterBareInjector` on top of the IInjector class(es) you wrote.
+avoid conflicts. Simply add the annotation `@BareInjector` on top of the IInjector class(es) you wrote.
 
 ### Obfuscation support
 You may pass a mappings file to the processor by adding this to your `build.gradle`:
@@ -187,6 +187,14 @@ field allows you to customize that (obviously, combined with `@Target`'s `method
 has an obligatory `parent` field, and a number of optional ones that you should already be familiar with.
 
 The base will be unaffected by `@Overridden` for all purposes except obfuscation of the name.
+
+### Mixin support
+If you want to use [Lillero-mixin](https://github.com/zaaarf/lillero-mixin) in your project, the processor can generate
+the fake `@Mixin` class for you. Just pass it the `fakeMixin` in form of a fully-qualified name for the generated class
+and it will do so!
+
+This feature can support `@BareInjector`s *if* you also add a `@Patch` annotation specifying what they are targeting.
+The extra annotation will be effectively ignored for all purposes except the fake Mixin generation.
 
 ### Other processor arguments
 In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
