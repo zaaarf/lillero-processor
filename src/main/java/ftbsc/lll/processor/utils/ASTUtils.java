@@ -14,6 +14,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
@@ -388,32 +389,30 @@ public class ASTUtils {
 			}
 		}
 
-		if(context.getSuperclass().getKind() == TypeKind.NONE) {
-			return method;
-		} else {
-			ExecutableElement found = findOverloadedMethod(
-				(TypeElement) env.getTypeUtils().asElement(context.getSuperclass()),
-				method,
-				env
-			);
+		List<TypeElement> potentialDeclarers = new ArrayList<>();
 
-			// if the superclass tree did not find anything, try the interfaces
-			if(found.equals(method)) {
-				for(TypeMirror i : context.getInterfaces()) {
-					ExecutableElement interfaceFound = findOverloadedMethod(
-						(TypeElement) env.getTypeUtils().asElement(i),
-						method,
-						env
-					);
-
-					if(!interfaceFound.equals(found)) {
-						return interfaceFound;
-					}
-				}
-			}
-
-			return found;
+		if(context.getSuperclass().getKind() != TypeKind.NONE) {
+			potentialDeclarers.add((TypeElement) env.getTypeUtils().asElement(context.getSuperclass()));
 		}
+
+		for(TypeMirror i : context.getInterfaces()) {
+			if(i.getKind() != TypeKind.NONE) {
+				potentialDeclarers.add((TypeElement) env.getTypeUtils().asElement(i));
+			}
+		}
+
+		// don't recurse above your pay grade
+		potentialDeclarers.removeIf(d -> d.getQualifiedName().contentEquals("java.lang.Object"));
+
+		for(TypeElement declarer : potentialDeclarers) {
+			ExecutableElement found = findOverloadedMethod(declarer, method, env);
+			if(!found.equals(method)) {
+				method = found;
+				break;
+			}
+		}
+
+		return method;
 	}
 
 	/**
