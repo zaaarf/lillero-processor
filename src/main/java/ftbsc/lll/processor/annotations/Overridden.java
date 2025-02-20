@@ -11,8 +11,6 @@ import java.lang.annotation.RetentionPolicy;
  * should use this annotation to define the signature of the top-level method.
  * By default, this will be used for any method annotated with {@link Target} with
  * the same name present in the same class.
- * This annotation will be ignored if {@link Target#lookForParent()} is set to false
- * in the matching method.
  * @since 0.8.0
  */
 @Retention(RetentionPolicy.CLASS)

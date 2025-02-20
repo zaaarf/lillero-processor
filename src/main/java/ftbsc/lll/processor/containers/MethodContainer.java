@@ -74,19 +74,26 @@ public class MethodContainer {
 	) {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
-			if(descriptor == null) {
-				throw new AmbiguousDefinitionException("Cannot use name-based lookups for methods of unverifiable classes!");
-			} else this.elem = null;
+			if(strict) {
+				this.elem = null;
+			} else {
+				throw new AmbiguousDefinitionException(
+					"Cannot use name-based lookups for methods of unverifiable classes!"
+				);
+			}
 		} else {
 			ExecutableElement tmp = (ExecutableElement) findMember(
-				parent, name, descriptor, descriptor != null && strict,false, options.env
+				parent, name, descriptor, strict, false, options.env
 			);
 
 			if(bridge) {
 				this.elem = findSyntheticBridge(tmp, options.env);
 			} else this.elem = tmp;
+
 			name = this.elem.getSimpleName().toString();
-			descriptor = descriptorFromExecutableElement(this.elem, options.env);
+			if(strict) {
+				descriptor = descriptorFromExecutableElement(this.elem, options.env);
+			}
 		}
 
 		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper);
@@ -126,8 +133,13 @@ public class MethodContainer {
 			);
 		} else this.data = baseData;
 
-		this.descriptorObf = options.mapper == null ? this.data.signature.descriptor
-			: MappingUtils.mapMethodDescriptor(this.data.signature.descriptor, options.mapper, false);
+		if(strict) {
+			descriptor = this.data.signature.descriptor;
+		}
+
+		this.descriptorObf = options.mapper == null
+			? descriptor
+			: MappingUtils.mapMethodDescriptor(descriptor, options.mapper, false);
 	}
 
 	/**
@@ -155,9 +167,7 @@ public class MethodContainer {
 		String name = !t.methodName().isEmpty()
 			?	t.methodName() // name was specified in target
 			: stub.getSimpleName().toString();
-		String descriptor = t.strict()
-			? descriptorFromExecutableElement(stub, options.env)
-			: null;
+		String descriptor = descriptorFromExecutableElement(stub, options.env);
 
 		ExecutableElement overriddenStub = t.lookForParent()
 			? findOverriddenStub(stub)
