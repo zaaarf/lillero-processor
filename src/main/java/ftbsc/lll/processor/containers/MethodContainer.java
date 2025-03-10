@@ -58,7 +58,6 @@ public class MethodContainer {
 	 * @param descriptor the descriptor of the target method
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
-	 * @param lookForParent whether the top-level parent of @Override should be used for mapping instead
 	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
@@ -68,7 +67,6 @@ public class MethodContainer {
 		String descriptor,
 		boolean strict,
 		boolean bridge,
-		boolean lookForParent,
 		ExecutableElement overriddenStub,
 		ProcessorOptions options
 	) {
@@ -96,10 +94,12 @@ public class MethodContainer {
 			}
 		}
 
-		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper);
+		boolean[] lookupOutcome = { true };
+		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper, lookupOutcome);
 		// some mapping formats omit methods if they are overriding a parent's method
-		// since there is no drawback but efficiency, let's use the top parent's name for that (when possible)
-		if(lookForParent && this.parent.elem != null) {
+		// when baseData's obfuscation lookup fails, try to look up the top parent, since there is no
+		// drawback but efficiency
+		if(this.parent.elem != null && (overriddenStub != null || !lookupOutcome[0])) {
 			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
 			ExecutableElement top;
 			if(overriddenStub != null) {
@@ -122,7 +122,8 @@ public class MethodContainer {
 				topParentData.name,
 				top.getSimpleName().toString(),
 				descriptorFromExecutableElement(top, options.env),
-				options.mapper
+				options.mapper,
+				null
 			);
 
 			this.data = new MethodData(
@@ -169,18 +170,13 @@ public class MethodContainer {
 			: stub.getSimpleName().toString();
 		String descriptor = descriptorFromExecutableElement(stub, options.env);
 
-		ExecutableElement overriddenStub = t.lookForParent()
-			? findOverriddenStub(stub)
-			: null;
-
 		return new MethodContainer(
 			parent,
 			name,
 			descriptor,
 			t.strict(),
 			t.bridge(),
-			t.lookForParent(),
-			overriddenStub,
+			findOverriddenStub(stub),
 			options
 		);
 	}

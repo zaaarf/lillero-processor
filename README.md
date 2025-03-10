@@ -165,14 +165,14 @@ This feature is powered by [Lillero-mapper](https://github.com/zaaarf/lillero-ma
 my personal recommendation is `tinyv2`, but see the project's README for more information.
 
 #### Limitations
-Many mapping formats like to "trim" their contents by not repeating information about overriding methods. Generally,
-Lillero will *attempt* to find its way up to the top-level method, every time, to compensate for that.
+Many mapping formats like to "trim" their contents by not repeating information about overriding methods. In general,
+when failing to find a perfect match in the mappings, Lillero will *attempt* to find its way up to the top-level method,
+to compensate for that.
 
-However, the inherent limitations of the AST environment are such that the processor *will* fail to find its way up
-the tree if type erasure is involved. The actual overriding methods will be synthetic, but the processor can't know
-anything about them since it operates before the compiler creates them. To mitigate this, you can use the annotation
-`@Overridden`, which allows the user to write a stub for the top-level parent (thus specifying the signature of the
-method which will actually carry the obfuscation information).
+However, it *may* fail find its way up the tree in particularly complex cases of chained type erasure, or when using
+particularly uncooperative mapping formats. To mitigate these rare occurrences, you can use `@Overridden`, which
+allows the user to write a stub for the top-level parent (thus specifying the signature of the method which will
+actually carry the obfuscation information).
 
 ```java
 @Overridden(parent = IGenericInterface.class)
@@ -182,16 +182,16 @@ abstract<T extends SomeClass> void someMethod(T input);
 abstract<T extends SubClassOfSomeClass> void someMethod(T input);
 ```
 
-`@Overidden` will know what `@Target` stuff it's aimed at by the name; if that proves not enough for your case, a `by`
+`@Overidden` will know what `@Target` it's aimed at by the name; if that proves not enough for your case, a `by`
 field allows you to customize that (obviously, combined with `@Target`'s `methodName`, which it will **ignore**). It
 has an obligatory `parent` field, and a number of optional ones that you should already be familiar with.
 
-The base will be unaffected by `@Overridden` for all purposes except obfuscation of the name.
+The base method will be unaffected by `@Overridden` for all purposes except obfuscation of the name.
 
 ### Mixin support
 If you want to use [Lillero-mixin](https://github.com/zaaarf/lillero-mixin) in your project, the processor can generate
-the fake `@Mixin` class for you. Just pass it the `fakeMixin` in form of a fully-qualified name for the generated class
-and it will do so!
+the fake `@Mixin` class for you. Just pass it the `fakeMixin` argument in form of a fully-qualified name for the
+generated class and it will do so!
 
 This feature can support `@BareInjector`s *if* you also add a `@Patch` annotation specifying what they are targeting.
 The extra annotation will be effectively ignored for all purposes except the fake Mixin generation.

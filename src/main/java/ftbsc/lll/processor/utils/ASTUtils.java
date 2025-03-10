@@ -239,16 +239,27 @@ public class ASTUtils {
 	 * @param name the name of the member
 	 * @param descriptor the descriptor of the method
 	 * @param mapper the {@link Mapper} to use, may be null
-	 * @return the fully qualified class name
+	 * @param outcome an array whose first element will be set to false if an exception is thrown, may be null
+	 * @return the method data
 	 * @since 0.6.1
 	 */
-	public static MethodData getMethodData(String parent, String name, String descriptor, Mapper mapper) {
+	public static MethodData getMethodData(
+		String parent,
+		String name,
+		String descriptor,
+		Mapper mapper,
+		boolean[] outcome // janky but it's the lesser evil
+	) {
 		try {
 			parent = parent.replace('.', '/'); // just in case
 			if(mapper != null) {
 				return mapper.getMethodData(parent, name, descriptor);
 			}
-		} catch(MappingNotFoundException ignored) {}
+		} catch(MappingNotFoundException ex) {
+			if(outcome != null && outcome.length >= 1) {
+				outcome[0] = false;
+			}
+		}
 
 		return new MethodData(getClassData(name, mapper), name, name, descriptor);
 	}
@@ -260,7 +271,7 @@ public class ASTUtils {
 	 * @param parent the internal name of the parent class
 	 * @param name the name of the member
 	 * @param mapper the {@link Mapper} to use, may be null
-	 * @return the fully qualified class name
+	 * @return the field data
 	 * @since 0.6.1
 	 */
 	public static FieldData getFieldData(String parent, String name, Mapper mapper) {
