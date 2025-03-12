@@ -62,6 +62,12 @@ public class ProcessorOptions {
 	public final String fakeMixin;
 
 	/**
+	 * The package where the generated injectors will be put.
+	 * When this is null, the patches will be put in the same as the annotated class.
+	 */
+	public final String outputPackage;
+
+	/**
 	 * The public constructor, parses and stores all given arguments.
 	 * @param env the environment the processor is working in
 	 */
@@ -76,6 +82,7 @@ public class ProcessorOptions {
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
 		this.fakeMixin = env.getOptions().get("fakeMixin");
+		this.outputPackage = env.getOptions().get("outputPackage");
 	}
 
 	/**

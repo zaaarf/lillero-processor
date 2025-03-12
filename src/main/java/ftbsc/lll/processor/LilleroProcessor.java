@@ -330,7 +330,14 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(generateInjector(toGenerate.get(injName), this.processingEnv))
 				.build();
 
-			this.injectors.add(writeClass(this.processingEnv.getFiler(), packageName, injName, injectorClass));
+			this.injectors.add(writeClass(
+				this.processingEnv.getFiler(),
+				this.options.outputPackage != null
+					? this.options.outputPackage
+					: packageName,
+				injName,
+				injectorClass
+			));
 		}
 	}
 
