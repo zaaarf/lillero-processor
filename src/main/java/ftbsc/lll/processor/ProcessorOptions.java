@@ -24,7 +24,8 @@ public class ProcessorOptions {
 		"anonymousClassWarning",
 		"obfuscateInjectorMetadata",
 		"noServiceProvider",
-		"fakeMixin" // lillero-mixin support
+		"fakeMixin", // lillero-mixin support
+		"outputPackage" // mostly for lillero-mixin, but other use cases may exist
 	));
 
 	/**
