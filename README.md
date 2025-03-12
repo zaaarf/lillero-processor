@@ -196,6 +196,14 @@ generated class and it will do so!
 This feature can support `@BareInjector`s *if* you also add a `@Patch` annotation specifying what they are targeting.
 The extra annotation will be effectively ignored for all purposes except the fake Mixin generation.
 
+### Custom output package
+By default, the processor outputs the generated injector in the same package as the patch that defined it. However, in
+some cases you may want all your generated injectors to be put in a specific location; in this case, you can pass the
+`outputPackage` argument to specify it.
+
+Be mindful of the fact that this has the disadvantage that all your proxies (and method stubs, if you declared them as
+abstract) need to be declared as `protected`.
+
 ### Other processor arguments
 In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
 `anonymousClassWarning`, to disable, respectively, warnings about bad practices in usage, and reminders of the unsafety
