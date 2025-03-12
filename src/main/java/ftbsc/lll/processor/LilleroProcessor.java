@@ -39,7 +39,6 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	private final Set<String> injectors = new HashSet<>();
 
-
 	/**
 	 * A {@link Set} of {@link ClassName}s representing the classes that
 	 * are being targeted.
@@ -91,21 +90,19 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+		ProcessorOptions options = this.getProcessorOptions();
 		for(TypeElement annotation : annotations) {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
 					TypeElement type = (TypeElement) e;
-					if(e.getAnnotation(BareInjector.class) == null && this.isValidInjector(type)) {
+					if(this.isValidInjector(type)) {
 						this.generateClasses(type);
+						if(options.fakeMixin != null) {
+							this.markClassAsTarget(type);
+						}
+					} else if(options.fakeMixin != null && e.getAnnotation(BareInjector.class) != null) {
+						this.markClassAsTarget(type);
 					}
-
-					Patch ann = e.getAnnotation(Patch.class);
-					TypeMirror value = getTypeFromAnnotation(ann, Patch::value, this.processingEnv);
-					ClassName name = ClassName.get((TypeElement) this.processingEnv.getTypeUtils().asElement(value));
-					for(String inner : ann.inner()) {
-						name = name.nestedClass(inner);
-					}
-					this.targets.add(name);
 				}
 			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
 				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
@@ -122,8 +119,6 @@ public class LilleroProcessor extends AbstractProcessor {
 				}
 			}
 		}
-
-		ProcessorOptions options = this.getProcessorOptions();
 
 		if(options.fakeMixin != null && !this.injectors.isEmpty()) {
 			this.generateFakeMixinClass(options.fakeMixin);
@@ -162,6 +157,20 @@ public class LilleroProcessor extends AbstractProcessor {
 				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
 			return false;
 		}
+	}
+
+	/**
+	 * Marks the given class as a "target" for purposes of generating the fake mixin.
+	 * @param type the class in question
+	 */
+	private void markClassAsTarget(TypeElement type) {
+		Patch ann = type.getAnnotation(Patch.class);
+		TypeMirror value = getTypeFromAnnotation(ann, Patch::value, this.processingEnv);
+		ClassName name = ClassName.get((TypeElement) this.processingEnv.getTypeUtils().asElement(value));
+		for(String inner : ann.inner()) {
+			name = name.nestedClass(inner);
+		}
+		this.targets.add(name);
 	}
 
 	/**
