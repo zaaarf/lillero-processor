@@ -148,6 +148,16 @@ patching an anonymous class with the processor:
 
 Most if not all of this (although I have not tested it) should apply to local classes as well.
 
+### Unavailable classes
+Sometimes, you may want to patch a class that is unavailable in the current environment while still benefiting from most
+of the other pros of the processor. Every time you need to reference a class in an annotation (`@Patch`, twice in
+`@Find` and another time in `@Overridden`) there is also a `fqn()` parameter that takes in a string available to use.
+You may specify the fully-qualified name manually there, instead of using a class object.
+
+An attempt will _still_ be made to validate the given FQN and lookup the class; if not found, a warning will be printed,
+but it will otherwise function normally using the given FQN. Logically, if validation fields, no method or field of the
+class will be validated either.
+
 ### Hybrid setups
 Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these
 cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to 
