@@ -123,7 +123,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		}
 
 		if(options.fakeMixin != null && !this.injectors.isEmpty()) {
-			this.generateFakeMixinClass(options.fakeMixin);
+			this.generateFakeMixinClasses(options.fakeMixin);
 		}
 
 		if(!options.noServiceProvider && !this.injectors.isEmpty()) {
@@ -388,30 +388,38 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param fqn the fully-qualified name of the class
 	 * @since 0.8.2
 	 */
-	public void generateFakeMixinClass(String fqn) {
+	public void generateFakeMixinClasses(String fqn) {
 		int lastPeriod = fqn.lastIndexOf('.');
 		String pkg = fqn.substring(0, Math.max(0, lastPeriod));
 		String clazz = fqn.substring(lastPeriod + 1);
 
+		// generate real mixin
 		AnnotationSpec.Builder mixinAnn = AnnotationSpec.builder(ClassName.get(
 			"org.spongepowered.asm.mixin",
 			"Mixin"
 		));
 
+		boolean isPseudo = false;
 		for(Map.Entry<ClassName, Boolean> targetName : this.targets.entrySet()) {
 			if(targetName.getValue()) {
 				mixinAnn.addMember("value", "$T.class", targetName.getKey()); // true = as .class
 			} else {
 				mixinAnn.addMember("targets", "$S", targetName.getKey().reflectionName()); // false = as string
+				isPseudo = true;
 			}
 		}
 
-		TypeSpec spec = TypeSpec.classBuilder(clazz)
-			.addModifiers(Modifier.PUBLIC)
-			.addAnnotation(mixinAnn.build())
-			.build();
+		TypeSpec.Builder spec = TypeSpec.classBuilder(clazz).addModifiers(Modifier.PUBLIC);
+		if(isPseudo) {
+			spec.addAnnotation(AnnotationSpec.builder(ClassName.get("org.spongepowered.asm.mixin", "Pseudo")).build());
+		}
 
-		writeClass(this.processingEnv.getFiler(), pkg, clazz, spec);
+		writeClass(
+			this.processingEnv.getFiler(),
+			pkg,
+			clazz,
+			spec.addAnnotation(mixinAnn.build()).build()
+		);
 	}
 
 	/**
