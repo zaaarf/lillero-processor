@@ -222,6 +222,11 @@ You may disable certain warnings issued by the processor by passing `false` or `
 These default to `true` when unspecified: the normal behaviour is to warn when doing such unsafe things, but you may
 want to disable them if you are sure that there is no better way to do what you're doing.
 
+### Other processor args
+There are a few more processor arguments that this can take.
+- `noServiceProvider`: when set to `true`, skips generation of the service provider file.
+- `obfuscateInjectorMetadata`: when set to `false`, only proxies are obfuscated, `IInjector` data is not.
+
 ## Conclusions and Extras
 The processor's API should remain mostly stable, unless glaring issues are found, at least until version `1.0.0`.
 It has changed much in the past versions, but I am confident that the current design is capable of handling most,
