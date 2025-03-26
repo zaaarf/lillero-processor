@@ -76,33 +76,35 @@ public class FieldContainer {
 	/**
 	 * Finds a {@link FieldContainer} from a finder.
 	 * @param finder the {@link VariableElement} annotated with {@link Find} for this field
-	 * @param options the {@link ProcessorOptions} to be used
+	 * @param opts the {@link ProcessorOptions} to be used
 	 * @return the built {@link FieldContainer}
 	 * @since 0.5.0
 	 */
-	public static FieldContainer from(VariableElement finder, ProcessorOptions options) {
+	public static FieldContainer from(VariableElement finder, ProcessorOptions opts) {
 		// the parent always has a @Patch annotation
-		Patch patchAnn = finder.getEnclosingElement().getAnnotation(Patch.class);
+		Patch p = finder.getEnclosingElement().getAnnotation(Patch.class);
 		// the finder always has a @Find annotation
 		Find f = finder.getAnnotation(Find.class);
 
-		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from((TypeElement) finder.getEnclosingElement(), options), patchAnn, f, options
-		);
+		ClassContainer parent = ClassContainer.findOrFallback((TypeElement) finder.getEnclosingElement(), p, f, opts);
 
 		String name = f.name().isEmpty() ? finder.getSimpleName().toString() : f.name();
 		String descriptor;
-		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, options.env);
+		TypeMirror fieldType = getTypeFromAnnotation(f, Find::type, opts.env);
 		if(fieldType.toString().equals("java.lang.Object")) {
 			descriptor = null;
 		} else {
 			if(fieldType.getKind() != TypeKind.VOID && !fieldType.getKind().isPrimitive()) {
 				descriptor = String.format("L%s;", ClassContainer.from(
-					f, Find::type, f.typeInner(), options
+					f,
+					Find::type,
+					f.typeFqn(),
+					f.typeInner(),
+					opts
 				).data.nameMapped);
-			} else descriptor = descriptorFromType(fieldType, options.env);
+			} else descriptor = descriptorFromType(fieldType, opts.env);
 		}
 
-		return new FieldContainer(parent, name, descriptor, options);
+		return new FieldContainer(parent, name, descriptor, opts);
 	}
 }

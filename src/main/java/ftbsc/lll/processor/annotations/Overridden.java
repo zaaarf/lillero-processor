@@ -33,6 +33,13 @@ public @interface Overridden {
 	Class<?> parent();
 
 	/**
+	 * @return the fully-qualified name of the target, which overrides {@link #parent()}
+	 * @since 0.8.8
+	 * @see Patch#fqn() for details
+	 */
+	String parentFqn() default "";
+
+	/**
 	 * This defines, if present, the private inner class where the target is contained.
 	 * @return the name of the inner class that contains the target, defaults to empty
 	 *         string (not an inner class)

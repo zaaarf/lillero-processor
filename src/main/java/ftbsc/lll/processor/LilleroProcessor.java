@@ -8,6 +8,7 @@ import ftbsc.lll.processor.annotations.*;
 import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.processor.containers.InjectorInfo;
 import ftbsc.lll.processor.containers.MethodContainer;
+import ftbsc.lll.processor.utils.ASTUtils;
 import ftbsc.lll.proxies.ProxyType;
 import ftbsc.lll.proxies.impl.TypeProxy;
 
@@ -40,10 +41,11 @@ public class LilleroProcessor extends AbstractProcessor {
 	private final Set<String> injectors = new HashSet<>();
 
 	/**
-	 * A {@link Set} of {@link ClassName}s representing the classes that
-	 * are being targeted.
+	 * A {@link Map} of {@link ClassName}s representing the classes that
+	 * are being targeted; the value is a boolean that determines whether
+	 * this is to be added as a class or as a string.
 	 */
-	private final Set<ClassName> targets = new HashSet<>();
+	private final Map<ClassName, Boolean> targets = new HashMap<>();
 
 	/**
 	 * An object representing the various options passed to the processor.
@@ -165,60 +167,90 @@ public class LilleroProcessor extends AbstractProcessor {
 	 */
 	private void markClassAsTarget(TypeElement type) {
 		Patch ann = type.getAnnotation(Patch.class);
-		TypeMirror value = getTypeFromAnnotation(ann, Patch::value, this.processingEnv);
-		ClassName name = ClassName.get((TypeElement) this.processingEnv.getTypeUtils().asElement(value));
+
+		boolean asClass = ann.fqn().isEmpty();
+
+		ClassName name;
+		if(asClass) {
+			name = ClassName.get((TypeElement) this.processingEnv.getTypeUtils().asElement(
+				getTypeFromAnnotation(ann, Patch::value, this.processingEnv)
+			));
+		} else {
+			String fqn = ann.fqn();
+			int lastDot = fqn.lastIndexOf('.');
+			String[] classNames = fqn.substring(lastDot + 1).split("\\$");
+			name = ClassName.get(
+				fqn.substring(0, lastDot),
+				classNames[0],
+				Arrays.copyOfRange(classNames, 1, classNames.length)
+			);
+		}
+
 		for(String inner : ann.inner()) {
 			name = name.nestedClass(inner);
+			if(!ASTUtils.shouldValidate(inner)) {
+				asClass = false;
+			}
 		}
-		this.targets.add(name);
+
+		if(asClass) {
+			this.targets.put(name, true);
+		} else {
+			// verifiable classes are always preferred, so if one class appears
+			// multiple times "true" should always win
+			this.targets.putIfAbsent(name, false);
+		}
 	}
 
 	/**
-	 * Generates the Injector(s) contained in the given class.
+	 * Generates the injector(s) contained in the given class.
 	 * Basically implements the {@link IInjector} interface for you.
 	 * @param cl the {@link TypeElement} for the given class
 	 */
 	private void generateClasses(TypeElement cl) {
-		//find class information
+		// find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
+		ProcessorOptions opts = this.getProcessorOptions();
 		ClassContainer targetClass = ClassContainer.from(
-			patchAnn, Patch::value, patchAnn.inner(), this.getProcessorOptions()
+			patchAnn,
+			Patch::value,
+			patchAnn.fqn(),
+			patchAnn.inner(),
+			opts
 		);
-		//find package information
+
+		// find package information
 		Element packageElement = cl.getEnclosingElement();
 		while (packageElement.getKind() != ElementKind.PACKAGE)
 			packageElement = packageElement.getEnclosingElement();
 		String packageName = packageElement.toString();
 
-		//find annotated elements
+		// find annotated elements
 		List<ExecutableElement> targets = findAnnotatedElement(cl, Target.class);
 		List<ExecutableElement> injectors = findAnnotatedElement(cl, Injector.class);
 		List<VariableElement> finders = findAnnotatedElement(cl, Find.class);
 
-		//initialize the constructor builder
+		// initialize the constructor builder
 		MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder();
 		constructorBuilder.addModifiers(Modifier.PUBLIC);
 
 		List<VariableElement> methodFinders = new ArrayList<>();
 
-		//take care of TypeProxies and FieldProxies first
+		// take care of TypeProxies and FieldProxies first
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar);
 			if(type == ProxyType.METHOD && proxyVar.getAnnotation(Find.class).name().isEmpty()) {
-				//methods without a specified name will be handled later
+				// methods without a specified name will be handled later
 				methodFinders.add(proxyVar);
 				continue;
 			}
-			//case-specific handling
+
+			// case-specific handling
 			if(type == ProxyType.TYPE) {
-				//find and validate
-				ClassContainer clazz = ClassContainer.findOrFallback(
-					ClassContainer.from(cl, this.getProcessorOptions()),
-					patchAnn,
-					proxyVar.getAnnotation(Find.class),
-					this.getProcessorOptions()
-				);
-				//types can be generated with a single instruction
+				// find and validate
+				ClassContainer clazz = ClassContainer.findOrFallback(cl, patchAnn, proxyVar.getAnnotation(Find.class), opts);
+
+				// types can be generated with a single instruction
 				constructorBuilder.addStatement(
 					"super.$L = $T.from($S, 0, $L)",
 					proxyVar.getSimpleName().toString(),
@@ -236,10 +268,10 @@ public class LilleroProcessor extends AbstractProcessor {
 				);
 		}
 
-		//this will contain the classes to generate: the key is the class name
+		// this will contain the classes to generate: the key is the class name
 		HashMap<String, InjectorInfo> toGenerate = new HashMap<>();
 
-		//these are needed for orphan checks
+		// these are needed for orphan checks
 		HashSet<ExecutableElement> matchedInjectors = new HashSet<>();
 		HashSet<VariableElement> matchedMethodFinders = new HashSet<>();
 
@@ -250,7 +282,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				List<ExecutableElement> injectorCandidates = injectors;
 				List<VariableElement> finderCandidates = methodFinders;
 
-				//find target by name
+				// find target by name
 				injectorCandidates =
 					injectorCandidates
 						.stream()
@@ -262,7 +294,7 @@ public class LilleroProcessor extends AbstractProcessor {
 						.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
 						.collect(Collectors.toList());
 
-				//throw exception if user is a moron and defined a finder and an injector with the same name
+				// throw exception if user is a moron and defined a finder and an injector with the same name
 				if(!finderCandidates.isEmpty() && !injectorCandidates.isEmpty())
 					throw new AmbiguousDefinitionException(
 						String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
@@ -286,16 +318,16 @@ public class LilleroProcessor extends AbstractProcessor {
 					);
 				else {
 					if(injectorCandidates.size() == 1) {
-						//matched an injector!
+						// matched an injector!
 						ExecutableElement injector = injectorCandidates.get(0);
 						matchedInjectors.add(injector);
 						toGenerate.put(
 							String.format("%sInjector%d", generateRealClassName(cl), iterationNumber),
 							new InjectorInfo(injector, tg, targetAnn, this.getProcessorOptions())
 						);
-						iterationNumber++; //increment is only used by injectors
+						iterationNumber++; // increment is only used by injectors
 					} else {
-						//matched a finder!
+						// matched a finder!
 						VariableElement finder = finderCandidates.get(0);
 						matchedMethodFinders.add(finder);
 						appendMemberFinderDefinition(
@@ -310,7 +342,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			}
 		}
 
-		//find orphans, throw exception if any are found
+		// find orphans, throw exception if any are found
 		for(ExecutableElement e : injectors)
 			if(!matchedInjectors.contains(e))
 				throw new OrphanElementException(e);
@@ -318,7 +350,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(!matchedMethodFinders.contains(e))
 				throw new OrphanElementException(e);
 
-		//iterate over the map and generate the classes
+		// iterate over the map and generate the classes
 		for(String injName : toGenerate.keySet()) {
 			MethodContainer target = toGenerate.get(injName).target;
 			TypeSpec injectorClass = TypeSpec.classBuilder(injName)
@@ -366,8 +398,12 @@ public class LilleroProcessor extends AbstractProcessor {
 			"Mixin"
 		));
 
-		for(ClassName targetName : this.targets) {
-			mixinAnn.addMember("value", "$T.class", targetName);
+		for(Map.Entry<ClassName, Boolean> targetName : this.targets.entrySet()) {
+			if(targetName.getValue()) {
+				mixinAnn.addMember("value", "$T.class", targetName.getKey()); // true = as .class
+			} else {
+				mixinAnn.addMember("targets", "$S", targetName.getKey().reflectionName()); // false = as string
+			}
 		}
 
 		TypeSpec spec = TypeSpec.classBuilder(clazz)

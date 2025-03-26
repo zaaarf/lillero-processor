@@ -105,7 +105,13 @@ public class MethodContainer {
 			if(overriddenStub != null) {
 				Overridden o = overriddenStub.getAnnotation(Overridden.class);
 				top = (ExecutableElement) findMember(
-					ClassContainer.from(o, Overridden::parent, o.parentInner(), options),
+					ClassContainer.from(
+						o,
+						Overridden::parent,
+						o.parentFqn(),
+						o.parentInner(),
+						options
+					),
 					overriddenStub.getSimpleName().toString(),
 					o.strict() ? descriptorFromExecutableElement(overriddenStub, options.env) : null,
 					o.strict(),
@@ -148,7 +154,7 @@ public class MethodContainer {
 	 * @param stub the {@link ExecutableElement} for the stub
 	 * @param t the {@link Target} annotation relevant to this case
 	 * @param f the {@link Find} annotation containing fallback data, may be null
-	 * @param options the {@link ProcessorOptions} to be used
+	 * @param opts the {@link ProcessorOptions} to be used
 	 * @return the {@link MethodContainer} corresponding to the method
 	 * @throws AmbiguousDefinitionException if it finds more than one candidate
 	 * @throws TargetNotFoundException if it finds no valid candidate
@@ -158,17 +164,15 @@ public class MethodContainer {
 		ExecutableElement stub,
 		Target t,
 		Find f,
-		ProcessorOptions options
+		ProcessorOptions opts
 	) {
 		// the parent always has a @Patch annotation
-		Patch patchAnn = stub.getEnclosingElement().getAnnotation(Patch.class);
-		ClassContainer parent = ClassContainer.findOrFallback(
-			ClassContainer.from((TypeElement) stub.getEnclosingElement(), options), patchAnn, f, options
-		);
+		Patch p = stub.getEnclosingElement().getAnnotation(Patch.class);
+		ClassContainer parent = ClassContainer.findOrFallback((TypeElement) stub.getEnclosingElement(), p, f, opts);
 		String name = !t.methodName().isEmpty()
 			?	t.methodName() // name was specified in target
 			: stub.getSimpleName().toString();
-		String descriptor = descriptorFromExecutableElement(stub, options.env);
+		String descriptor = descriptorFromExecutableElement(stub, opts.env);
 
 		return new MethodContainer(
 			parent,
@@ -177,7 +181,7 @@ public class MethodContainer {
 			t.strict(),
 			t.bridge(),
 			findOverriddenStub(stub),
-			options
+			opts
 		);
 	}
 

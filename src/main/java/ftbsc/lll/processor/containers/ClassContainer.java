@@ -32,20 +32,29 @@ public class ClassContainer {
 	public final TypeElement elem;
 
 	/**
-	 * Private constructor, called from {@link #from(Annotation, Function, String[], ProcessorOptions)}.
+	 * Private constructor, called from the factory methods.
 	 * @param fqn the fully-qualified name of the target class
 	 * @param innerNames an array of Strings containing the path to the inner class, may be null
 	 * @param options the {@link ProcessorOptions} to be used
+	 * @param manual whether this fully-qualified was manually inputed by the user
 	 */
-	private ClassContainer(String fqn, String[] innerNames, ProcessorOptions options) {
+	private ClassContainer(String fqn, String[] innerNames, ProcessorOptions options, boolean manual) {
 		// find and validate
 		TypeElement elem = options.env.getElementUtils().getTypeElement(fqn);
 
-		if(elem == null)
-			throw new TargetNotFoundException("class", fqn);
+		if(elem == null) {
+			if(manual) {
+				options.env.getMessager().printMessage(
+					Diagnostic.Kind.WARNING,
+					String.format("Manually-specified fully-qualified name %s could not be verified!", fqn)
+				);
+			} else {
+				throw new TargetNotFoundException("class", fqn);
+			}
+		}
 
 		StringBuilder fqnBuilder = new StringBuilder(
-			internalNameFromType(elem.asType(), options.env).replace('/', '.')
+			manual ? fqn : internalNameFromType(elem.asType(), options.env).replace('/', '.')
 		);
 
 		if(innerNames != null) {
@@ -53,7 +62,7 @@ public class ClassContainer {
 			for(String inner : innerNames) {
 				if(inner != null) fqnBuilder.append('$').append(inner);
 				if(skip) continue;
-				if(shouldValidate(inner)) {
+				if(elem != null && shouldValidate(inner)) {
 					elem = elem
 						.getEnclosedElements()
 						.stream()
@@ -88,6 +97,7 @@ public class ClassContainer {
 	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
 	 * @param ann the annotation containing the class
 	 * @param classFunction the annotation function returning the class
+	 * @param fqn the fully qualified name to use as override
 	 * @param innerNames a string containing the inner class name or nothing
 	 * @param options the {@link ProcessorOptions} to be used
 	 * @param <T> the type of the annotation carrying the information
@@ -97,40 +107,37 @@ public class ClassContainer {
 	public static <T extends Annotation> ClassContainer from(
 		T ann,
 		Function<T, Class<?>> classFunction,
+		String fqn,
 		String[] innerNames,
 		ProcessorOptions options
 	) {
-		String fqn = getTypeFromAnnotation(ann, classFunction, options.env).toString();
+		String chosenFqn = fqn.isEmpty()
+			? getTypeFromAnnotation(ann, classFunction, options.env).toString()
+			: fqn;
 		String[] inner = innerNames != null && innerNames.length != 0
 			? String.join("$", innerNames).split("\\$")
 			: null;
-		return new ClassContainer(fqn, inner, options);
-	}
-
-	/**
-	 * Safely extracts a {@link Class} from an annotation and gets its fully qualified name.
-	 * @param cl the {@link TypeElement} representing the class
-	 * @param options the {@link ProcessorOptions} to be used
-	 * @return the fully qualified name of the given class
-	 * @since 0.6.0
-	 */
-	public static ClassContainer from(TypeElement cl, ProcessorOptions options) {
-		return new ClassContainer(cl.getQualifiedName().toString(), null, options);
+		return new ClassContainer(chosenFqn, inner, options, !fqn.isEmpty());
 	}
 
 	/**
 	 * Finds and builds a {@link ClassContainer} based on information contained
 	 * within {@link Patch} or a {@link Find} annotations, else returns a fallback.
-	 * @param fallback the {@link ClassContainer} it falls back on
+	 * @param fallback the {@link TypeElement} it falls back on
 	 * @param p the {@link Patch} annotation to get info from
 	 * @param f the {@link Find} annotation to get info from
 	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the built {@link ClassContainer} or the fallback if not enough information was present
 	 * @since 0.5.0
 	 */
-	public static ClassContainer findOrFallback(ClassContainer fallback, Patch p, Find f, ProcessorOptions options) {
-		if(f == null) return ClassContainer.from(p, Patch::value, p.inner(), options);
-		ClassContainer cl = ClassContainer.from(f, Find::value, f.inner(), options);
-		return cl.data.name.equals("java/lang/Object") ? fallback : cl;
+	public static ClassContainer findOrFallback(TypeElement fallback, Patch p, Find f, ProcessorOptions options) {
+		if(f == null) {
+			return ClassContainer.from(p, Patch::value, p.fqn(), p.inner(), options);
+		}
+
+		ClassContainer cl = ClassContainer.from(f, Find::value, f.fqn(), f.inner(), options);
+		return cl.data.name.equals("java/lang/Object")
+			? new ClassContainer(fallback.getQualifiedName().toString(), null, options, false)
+			: cl;
 	}
 }
