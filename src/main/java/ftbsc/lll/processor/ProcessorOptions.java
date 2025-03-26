@@ -40,10 +40,16 @@ public class ProcessorOptions {
 	public final Mapper mapper;
 
 	/**
-	 * Whether the processor should issue warnings when compiling code anonymous
-	 * classes which can't be checked for validity.
+	 * Whether the processor should issue a warning when generating for an anonymous
+	 * class which can't be checked for validity.
 	 */
 	public final boolean anonymousClassWarning;
+
+	/**
+	 * Whether the processor should issue a warning when a manually specified fully
+	 * qualified name can't be checked for validity.
+	 */
+	public final boolean manualClassWarning;
 
 	/**
 	 * Whether injector metadata (what is returned by the functions of {@link IInjector})
@@ -57,7 +63,7 @@ public class ProcessorOptions {
 	public final boolean noServiceProvider;
 
 	/**
-	 * The fully qualified name of the fake mixin class to generate.
+	 * The fully qualified name of the fake mixin class to generate.Muting
 	 * No fake mixin class will be generated when this is null.
 	 */
 	public final String fakeMixin;
@@ -80,6 +86,7 @@ public class ProcessorOptions {
 			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, true);
 		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
+		this.manualClassWarning = parseBooleanArg(env.getOptions().get("manualClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
 		this.fakeMixin = env.getOptions().get("fakeMixin");

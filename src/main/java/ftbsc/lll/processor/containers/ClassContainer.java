@@ -44,10 +44,12 @@ public class ClassContainer {
 
 		if(elem == null) {
 			if(manual) {
-				options.env.getMessager().printMessage(
-					Diagnostic.Kind.WARNING,
-					String.format("Manually-specified fully-qualified name %s could not be verified!", fqn)
-				);
+				if(options.manualClassWarning) {
+					options.env.getMessager().printMessage(
+						Diagnostic.Kind.WARNING,
+						String.format("Manually-specified class %s and its children cannot not be verified by the processor!", fqn)
+					);
+				}
 			} else {
 				throw new TargetNotFoundException("class", fqn);
 			}
@@ -72,14 +74,17 @@ public class ClassContainer {
 						.findFirst()
 						.orElse(null);
 				} else {
-					options.env.getMessager().printMessage(
-						Diagnostic.Kind.WARNING,
-						String.format(
-							"Anonymous class %s$%s and its children cannot be verified by the processor!",
-							fqnBuilder,
-							inner
-						)
-					);
+					if(options.anonymousClassWarning) {
+						options.env.getMessager().printMessage(
+							Diagnostic.Kind.WARNING,
+							String.format(
+								"Anonymous class %s$%s and its children cannot be verified by the processor!",
+								fqnBuilder,
+								inner
+							)
+						);
+					}
+
 					elem = null;
 					skip = true;
 					continue;

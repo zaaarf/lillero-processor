@@ -214,10 +214,13 @@ some cases you may want all your generated injectors to be put in a specific loc
 Be mindful of the fact that this has the disadvantage that all your proxies (and method stubs, if you declared them as
 abstract) need to be declared as `protected`.
 
-### Other processor arguments
-In the same way you pass mappings, you may pass `false` or `0` to the boolean arguments `badPracticeWarnings` and
-`anonymousClassWarning`, to disable, respectively, warnings about bad practices in usage, and reminders of the unsafety
-of anonymous classes.
+### Muting compile-time warnings
+You may disable certain warnings issued by the processor by passing `false` or `0` to the following compiler arguments:
+- `anonymousClassWarning` to disable warnings when generating code for an anonymous class (which can never be verified).
+- `manualClassWarning` to disable warnings when generating code for a manually specified class which can't be verified.
+
+These default to `true` when unspecified: the normal behaviour is to warn when doing such unsafe things, but you may
+want to disable them if you are sure that there is no better way to do what you're doing.
 
 ## Conclusions and Extras
 The processor's API should remain mostly stable, unless glaring issues are found, at least until version `1.0.0`.

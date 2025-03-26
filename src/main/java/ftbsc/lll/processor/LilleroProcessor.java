@@ -156,7 +156,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		})) return true;
 		else {
 			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-				String.format("Missing valid @Injector method in @Patch class %s, skipping.", elem));
+				String.format("Missing valid @Injector method in @Patch class %s, skipping...", elem));
 			return false;
 		}
 	}
