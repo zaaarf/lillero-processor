@@ -97,13 +97,13 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
 					TypeElement type = (TypeElement) e;
-					if(this.isValidInjector(type)) {
+					if(options.fakeMixin != null && e.getAnnotation(BareInjector.class) != null) {
+						this.markClassAsTarget(type);
+					} else if(this.isValidInjector(type)) {
 						this.generateClasses(type);
 						if(options.fakeMixin != null) {
 							this.markClassAsTarget(type);
 						}
-					} else if(options.fakeMixin != null && e.getAnnotation(BareInjector.class) != null) {
-						this.markClassAsTarget(type);
 					}
 				}
 			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
