@@ -22,6 +22,7 @@ public class ProcessorOptions {
 	public static final Set<String> SUPPORTED = new HashSet<>(Arrays.asList(
 		"mappingsFile",
 		"anonymousClassWarning",
+		"manualClassWarning",
 		"obfuscateInjectorMetadata",
 		"noServiceProvider",
 		"fakeMixin", // lillero-mixin support
@@ -63,7 +64,7 @@ public class ProcessorOptions {
 	public final boolean noServiceProvider;
 
 	/**
-	 * The fully qualified name of the fake mixin class to generate.Muting
+	 * The fully qualified name of the fake mixin class to generate.
 	 * No fake mixin class will be generated when this is null.
 	 */
 	public final String fakeMixin;
