@@ -21,6 +21,8 @@ public class ProcessorOptions {
 	 */
 	public static final Set<String> SUPPORTED = new HashSet<>(Arrays.asList(
 		"mappingsFile",
+		"mappingsNamespaceFrom",
+		"mappingsNamespaceTo",
 		"anonymousClassWarning",
 		"manualClassWarning",
 		"obfuscateInjectorMetadata",
@@ -82,9 +84,11 @@ public class ProcessorOptions {
 	public ProcessorOptions(ProcessingEnvironment env) {
 		this.env = env;
 		String location = env.getOptions().get("mappingsFile");
+		String namespaceFrom = env.getOptions().get("mappingsNamespaceFrom");
+		String namespaceTo = env.getOptions().get("mappingsNamespaceTo");
 		if(location != null) {
 			List<String> lines = MapperProvider.fetchFromLocalOrRemote(location);
-			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, true);
+			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, namespaceFrom, namespaceTo, true);
 		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.manualClassWarning = parseBooleanArg(env.getOptions().get("manualClassWarning"), true);
