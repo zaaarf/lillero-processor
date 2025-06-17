@@ -15,7 +15,7 @@ import java.lang.annotation.RetentionPolicy;
  * @since 0.4.0
  */
 @Retention(RetentionPolicy.CLASS)
-@java.lang.annotation.Target(ElementType.FIELD)
+@java.lang.annotation.Target({ElementType.FIELD, ElementType.PARAMETER})
 public @interface Find {
 	/**
 	 * @return the {@link Class} object containing the target; the annotation's parent

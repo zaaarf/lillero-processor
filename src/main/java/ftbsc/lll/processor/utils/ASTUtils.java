@@ -13,10 +13,9 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
+import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,7 +34,7 @@ public class ASTUtils {
 	 * @since 0.2.0
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends Element>  List<T> findAnnotatedElement(Element parent, Class<? extends Annotation> ann) {
+	public static <T extends Element>  List<T> findAnnotatedEnclosedElements(Element parent, Class<? extends Annotation> ann) {
 		return parent.getEnclosedElements()
 			.stream()
 			.filter(e -> e.getAnnotationsByType(ann).length != 0)
@@ -497,5 +496,70 @@ public class ASTUtils {
 		} else if(NUMERIC.matcher(name).matches()) {
 			return false;
 		} else throw new InvalidClassNameException(name);
+	}
+
+	/**
+	 * Attempts to match a {@link Target} method.
+	 * @param parent the injector class
+	 * @param target the target method
+	 * @param targetAnn the {@link Target} annotation
+	 * @param injectorCandidates the injector candidates
+	 * @param finderCandidates the finder candidates
+	 * @param processingEnv the processing environment
+	 * @return a {@link ExecutableElement} if an injector was matched,
+	 *         a {@link VariableElement} if a finder was matched,
+	 *         or null if this was an orphan
+	 * @throws AmbiguousDefinitionException if the definition is ambiguous
+	 */
+	public static Element matchTarget(
+		TypeElement parent,
+		ExecutableElement target,
+		Target targetAnn,
+		List<ExecutableElement> injectorCandidates,
+		List<VariableElement> finderCandidates,
+		ProcessingEnvironment processingEnv
+	) {
+		// find target by name
+		injectorCandidates =
+			injectorCandidates
+				.stream()
+				.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
+				.collect(Collectors.toList());
+		finderCandidates =
+			finderCandidates
+				.stream()
+				.filter(i -> i.getSimpleName().contentEquals(targetAnn.of()))
+				.collect(Collectors.toList());
+
+		// throw exception if user is a moron and defined a finder and an injector with the same name
+		if(!finderCandidates.isEmpty() && !injectorCandidates.isEmpty()) {
+			throw new AmbiguousDefinitionException(
+				String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
+			);
+		} else if(finderCandidates.isEmpty() && injectorCandidates.isEmpty()) {
+			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+				String.format(
+					"Found orphan @Target annotation on method %s.%s pointing at method %s, it will be ignored!",
+					parent.getSimpleName().toString(),
+					target.getSimpleName().toString(),
+					targetAnn.of()
+				)
+			);
+			return null;
+		} else if(finderCandidates.isEmpty() && injectorCandidates.size() != 1) {
+			throw new AmbiguousDefinitionException(
+				String.format("Found multiple candidate injectors for target %s::%s!", parent.getSimpleName(), target.getSimpleName())
+			);
+		} else if(injectorCandidates.isEmpty() && finderCandidates.size() != 1) {
+			throw new AmbiguousDefinitionException(
+				String.format("Found multiple candidate finders for target %s::%s!", parent.getSimpleName(), target.getSimpleName())
+			);
+		} else {
+			if(injectorCandidates.size() == 1) {
+				return injectorCandidates.get(0);
+			} else {
+				return finderCandidates.get(0);
+			}
+		}
 	}
 }

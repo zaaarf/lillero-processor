@@ -21,7 +21,7 @@ javadoc {
 
 repositories {
 	mavenCentral()
-	maven { url = 'https://maven.fantabos.co' }
+	maven { url = 'https://maven.zaaarf.foo' }
 }
 
 dependencies {

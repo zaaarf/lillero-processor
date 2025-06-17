@@ -1,26 +1,12 @@
 package ftbsc.lll.processor.utils;
 
 import com.squareup.javapoet.*;
-import ftbsc.lll.processor.ProcessorOptions;
-import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.processor.annotations.Target;
-import ftbsc.lll.processor.containers.ClassContainer;
-import ftbsc.lll.processor.containers.FieldContainer;
-import ftbsc.lll.processor.containers.InjectorInfo;
-import ftbsc.lll.processor.containers.MethodContainer;
-import ftbsc.lll.proxies.ProxyType;
-import ftbsc.lll.proxies.impl.FieldProxy;
-import ftbsc.lll.proxies.impl.MethodProxy;
 
 import javax.annotation.processing.Filer;
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashSet;
-
-import static ftbsc.lll.processor.utils.ASTUtils.getProxyType;
-import static ftbsc.lll.processor.utils.ASTUtils.mapModifiers;
 
 /**
  * Collection of static utils that rely on JavaPoet to function.
@@ -39,84 +25,6 @@ public class JavaPoetUtils {
 			.returns(String.class)
 			.addStatement("return $S", returnString)
 			.build();
-	}
-
-	/**
-	 * Appends to a given {@link MethodSpec.Builder} definitions for a proxy.
-	 * @param var the {@link VariableElement} representing the proxy
-	 * @param stub the stub {@link ExecutableElement} if present or relevant, null otherwise
-	 * @param t the {@link Target} relevant to this finder if present or relevant, null otherwise
-	 * @param con the {@link MethodSpec.Builder} to append to
-	 * @param options the {@link ProcessorOptions} to be used
-	 * @since 0.5.0
-	 */
-	public static void appendMemberFinderDefinition(
-		VariableElement var, ExecutableElement stub, Target t,
-		MethodSpec.Builder con, ProcessorOptions options) {
-		ProxyType type = getProxyType(var);
-		if(type != ProxyType.METHOD && type != ProxyType.FIELD) {
-			return; // this method is irrelevant to everyone else
-		}
-
-		// we need this stuff
-		Find f = var.getAnnotation(Find.class);
-		final boolean isMethod = type == ProxyType.METHOD;
-		final String builderName = var.getSimpleName().toString() + "Builder";
-
-		String descriptorObf, nameObf;
-		ClassContainer parent;
-		Element target;
-
-		if(isMethod) {
-			MethodContainer mc = MethodContainer.from(stub, t, f, options);
-			descriptorObf = mc.descriptorObf;
-			nameObf = mc.data.nameMapped;
-			parent = mc.parent;
-			target = mc.elem;
-		} else {
-			FieldContainer fc = FieldContainer.from(var, options);
-			descriptorObf = fc.descriptorObf;
-			nameObf = fc.data.nameMapped;
-			parent = fc.parent;
-			target = fc.elem;
-		}
-
-		//initialize builder
-		con.addStatement("$T $L = $T.builder($S)",
-			isMethod ? MethodProxy.Builder.class : FieldProxy.Builder.class,
-			builderName, //variable name is always unique by definition
-			isMethod ? MethodProxy.class : FieldProxy.class,
-			nameObf
-		);
-
-		//set parent
-		con.addStatement(
-			"$L.setParent($S, $L)",
-			builderName,
-			parent.data.nameMapped.replace('/', '.'),
-			parent.elem == null ? 0 : mapModifiers(parent.elem.getModifiers())
-		);
-
-		//set modifiers
-		con.addStatement(
-			"$L.setModifiers($L)",
-			builderName,
-			target == null ? 0 : mapModifiers(target.getModifiers())
-		);
-
-		//set type(s)
-		con.addStatement(
-			"$L.setDescriptor($S)",
-			builderName,
-			descriptorObf
-		);
-
-		//build and set
-		con.addStatement(
-			"super.$L = $L.build()",
-			var.getSimpleName().toString(),
-			builderName
-		);
 	}
 
 	/**
@@ -141,36 +49,6 @@ public class JavaPoetUtils {
 					);
 			});
 		return specs;
-	}
-
-	/**
-	 * Generates the wrapper around a certain injector.
-	 * @param inj the {@link InjectorInfo} carrying the information about the target injector
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @return the generated {@link MethodSpec} for the injector
-	 * @since 0.6.0
-	 */
-	public static MethodSpec generateInjector(InjectorInfo inj, ProcessingEnvironment env) {
-		MethodSpec.Builder injectBuilder = MethodSpec.methodBuilder("inject")
-			.addModifiers(Modifier.PUBLIC)
-			.returns(void.class)
-			.addAnnotation(Override.class)
-			.addParameter(ParameterSpec.builder(
-				TypeName.get(env
-					.getElementUtils()
-					.getTypeElement("org.objectweb.asm.tree.ClassNode").asType()), "clazz")
-				.build())
-			.addParameter(ParameterSpec.builder(
-				TypeName.get(env
-					.getElementUtils()
-					.getTypeElement("org.objectweb.asm.tree.MethodNode").asType()), "main")
-				.build());
-
-		if(inj.injector.getParameters().size() == 2) {
-			injectBuilder.addStatement("super.$L(clazz, main)", inj.injector.getSimpleName());
-		} else injectBuilder.addStatement("super.$L(main)", inj.injector.getSimpleName());
-
-		return injectBuilder.build();
 	}
 
 	/**
