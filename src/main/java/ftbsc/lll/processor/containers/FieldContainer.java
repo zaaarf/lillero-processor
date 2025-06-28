@@ -8,6 +8,7 @@ import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
 import org.objectweb.asm.Type;
 
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
@@ -86,7 +87,15 @@ public class FieldContainer {
 		// the finder always has a @Find annotation
 		Find f = finder.getAnnotation(Find.class);
 
-		ClassContainer parent = ClassContainer.findOrFallback((TypeElement) finder.getEnclosingElement(), p, f, opts);
+		// fallback is either the parent or the parent's parent (in case @Find is on a method parameter)
+		TypeElement fallbackClass;
+		if(finder.getEnclosingElement() instanceof ExecutableElement) {
+			fallbackClass = (TypeElement) finder.getEnclosingElement().getEnclosingElement();
+		} else {
+			fallbackClass = (TypeElement) finder.getEnclosingElement();
+		}
+
+		ClassContainer parent = ClassContainer.findOrFallback(fallbackClass, p, f, opts);
 
 		String name = f.name().isEmpty() ? finder.getSimpleName().toString() : f.name();
 		String descriptor;
