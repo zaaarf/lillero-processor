@@ -228,8 +228,6 @@ public class LilleroProcessor extends AbstractProcessor {
 		List<ExecutableElement> injectors = findAnnotatedEnclosedElements(cl, Injector.class);
 		List<VariableElement> finders = findAnnotatedEnclosedElements(cl, Find.class);
 
-		Map<VariableElement, FinderInfo> matchedFinders = new HashMap<>();
-
 		// find annotated parameters
 		for(ExecutableElement injector : injectors) {
 			for(VariableElement p : injector.getParameters()) {
@@ -243,8 +241,9 @@ public class LilleroProcessor extends AbstractProcessor {
 		MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder();
 		constructorBuilder.addModifiers(Modifier.PUBLIC);
 
-		// these are needed to generate the class later
+		// these are needed to generate the class later (and for validation)
 		Map<ExecutableElement, InjectorInfo> toGenerate = new HashMap<>();
+		Map<VariableElement, FinderInfo> matchedFinders = new HashMap<>();
 
 		int injectorNumber = 0;
 		for(ExecutableElement tg : targets) {

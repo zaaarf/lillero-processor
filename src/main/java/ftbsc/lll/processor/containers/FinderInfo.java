@@ -17,6 +17,7 @@ import static ftbsc.lll.processor.utils.ASTUtils.mapModifiers;
 
 /**
  * Carries information about a {@link Find}/{@link Target} combination.
+ * @since 0.9.0
  */
 public class FinderInfo {
 	/**

@@ -46,7 +46,7 @@ public class MethodContainer {
 	/**
 	 * The {@link ExecutableElement} corresponding to the method.
 	 * May only be null intentionally i.e. when the method is
-	 * a child of an anonymous class.
+	 * a child of an anonymous class or for {@link Target#unchecked()}.
 	 */
 	public final ExecutableElement elem;
 
@@ -56,6 +56,7 @@ public class MethodContainer {
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target method
 	 * @param descriptor the descriptor of the target method
+	 * @param unchecked whether the matching should be unchecked (see {@link Target#unchecked()} for more info)
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
 	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
@@ -65,6 +66,7 @@ public class MethodContainer {
 		ClassContainer parent,
 		String name,
 		String descriptor,
+		boolean unchecked,
 		boolean strict,
 		boolean bridge,
 		ExecutableElement overriddenStub,
@@ -72,13 +74,15 @@ public class MethodContainer {
 	) {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
-			if(strict) {
+			if(unchecked || strict) {
 				this.elem = null;
 			} else {
 				throw new AmbiguousDefinitionException(
 					"Cannot use name-based lookups for methods of unverifiable classes!"
 				);
 			}
+		} else if(unchecked) {
+			this.elem = null;
 		} else {
 			ExecutableElement tmp = (ExecutableElement) findMember(
 				parent, name, descriptor, strict, false, options.env
@@ -96,10 +100,15 @@ public class MethodContainer {
 
 		boolean[] lookupOutcome = { true };
 		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper, lookupOutcome);
+
 		// some mapping formats omit methods if they are overriding a parent's method
 		// when baseData's obfuscation lookup fails, try to look up the top parent, since there is no
 		// drawback but efficiency
-		if(this.parent.elem != null && (overriddenStub != null || !lookupOutcome[0])) {
+		if(
+			this.parent.elem != null
+				&& (overriddenStub != null || !lookupOutcome[0])
+				&& (this.elem == null ^ overriddenStub == null)
+		) {
 			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
 			ExecutableElement top;
 			if(overriddenStub != null) {
@@ -178,6 +187,7 @@ public class MethodContainer {
 			parent,
 			name,
 			descriptor,
+			t.unchecked(),
 			t.strict(),
 			t.bridge(),
 			findOverriddenStub(stub),

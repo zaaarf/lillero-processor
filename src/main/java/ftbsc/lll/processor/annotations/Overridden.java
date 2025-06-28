@@ -53,4 +53,11 @@ public @interface Overridden {
 	 * @see Target#strict() for details
 	 */
 	boolean strict() default true;
+
+	/**
+	 * Whether to match in unchecked mode.
+	 * @return whether unchecked mode is to be used
+	 * @see Target#unchecked() for details
+	 */
+	boolean unchecked() default true;
 }

@@ -36,6 +36,19 @@ public @interface Target {
 	String methodName() default "";
 
 	/**
+	 * When set to true, tells the processor to avoid any attempts at verifying the existence of the
+	 * given method. This will still attempt to process mappings for the method and its arguments.
+	 * Do note that this should only be used as a last resort when no other option is available,
+	 * as this can potentially lead to runtime errors. This is useful, for instance, for patching
+	 * lambdas in newer versions of Java.
+	 * If this is ture, the finder will honor {@link #methodName()}, but ignore all other modifiers
+	 * (like {@link #strict()}).
+	 * @return whether unchecked mode is to be used
+	 * @since 0.9.0
+	 */
+	boolean unchecked() default false;
+
+	/**
 	 * When set to false, tells the processor to first try to match a single method by name,
 	 * and to only check parameters if further clarification is needed.
 	 * While non-strict mode is more computationally efficient, it's ultimately not
