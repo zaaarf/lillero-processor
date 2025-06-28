@@ -14,7 +14,6 @@ import ftbsc.lll.proxies.ProxyType;
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -22,6 +21,7 @@ import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.utils.ASTUtils.*;
 import static ftbsc.lll.processor.utils.JavaPoetUtils.*;
@@ -140,23 +140,53 @@ public class LilleroProcessor extends AbstractProcessor {
 	private boolean isValidInjector(TypeElement elem) {
 		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
 		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
-		if(elem.getEnclosedElements().stream().anyMatch(e -> e.getAnnotation(Target.class) != null)
-			&& elem.getEnclosedElements().stream().filter(e -> e instanceof ExecutableElement).anyMatch(e -> {
-			List<? extends TypeMirror> params = ((ExecutableType) e.asType()).getParameterTypes();
-			return e.getAnnotation(Injector.class) != null
-				&& e.getAnnotation(Target.class) == null
-				&& (
-					(params.size() == 2
-						&& this.processingEnv.getTypeUtils().isSameType(params.get(0), classNodeType)
-						&& this.processingEnv.getTypeUtils().isSameType(params.get(1), methodNodeType)
-					) || (params.size() == 1 && this.processingEnv.getTypeUtils().isSameType(params.get(0), methodNodeType))
-			);
-		})) return true;
-		else {
-			this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-				String.format("Missing valid @Injector method in @Patch class %s, skipping...", elem));
-			return false;
+		if(
+			elem.getEnclosedElements()
+				.stream()
+				.anyMatch(e -> e.getAnnotation(Target.class) != null)
+			&&
+				elem.getEnclosedElements()
+					.stream()
+					.filter(e -> e instanceof ExecutableElement)
+					.anyMatch(e -> {
+						// must have @Injector
+						if(e.getAnnotation(Injector.class) == null) {
+							return false;
+						}
+
+						// can't also have @Target
+						if(e.getAnnotation(Target.class) != null) {
+							return false;
+						}
+
+						// get parameters (finders aside)
+						List<VariableElement> effectiveParams = ((ExecutableElement) e).getParameters()
+							.stream()
+							.filter(p -> p.getAnnotation(Find.class) == null)
+							.collect(Collectors.toList());
+
+						// effective params must be either MethodNode or ClassNode and MethodNode (in any order)
+						return (
+							effectiveParams.size() == 1
+								&& this.processingEnv.getTypeUtils().isSameType(effectiveParams.get(0).asType(), methodNodeType)
+						) || (
+							effectiveParams.size() == 2
+								&& effectiveParams.stream().anyMatch(p -> this.processingEnv.getTypeUtils().isSameType(p.asType(), classNodeType))
+								&& effectiveParams.stream().anyMatch(p -> this.processingEnv.getTypeUtils().isSameType(p.asType(), methodNodeType))
+						);
+				})
+		) {
+			return true;
 		}
+
+		// print warning
+		this.processingEnv.getMessager().printMessage(
+			Diagnostic.Kind.WARNING,
+			String.format("Missing valid @Injector method in @Patch class %s, skipping...", elem)
+		);
+
+		return false;
+
 	}
 
 	/**
