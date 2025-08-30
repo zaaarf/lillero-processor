@@ -8,9 +8,7 @@ import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
 
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +40,11 @@ public class InjectorInfo {
 	public final String reason;
 
 	/**
+	 * The output packages.
+	 */
+	public final String outputPackage;
+
+	/**
 	 * The {@link MethodContainer} corresponding to the target method.
 	 */
 	public final MethodContainer target;
@@ -70,6 +73,23 @@ public class InjectorInfo {
 		this.injector = injector;
 		this.targetStub = targetStub;
 		this.reason = injector.getAnnotation(Injector.class).reason();
+
+		String localPkgOverride = injector.getAnnotation(Injector.class).outputPackage();
+		if(!localPkgOverride.equals(Injector.DEFAULT_OUTPUT_PACKAGE)) {
+			// local override
+			this.outputPackage = localPkgOverride;
+		} else if(options.outputPackage != null) {
+			// environment level override
+			this.outputPackage = options.outputPackage;
+		} else {
+			// fall back on current package
+			Element packageElement = injector.getEnclosingElement();
+			while(packageElement.getKind() != ElementKind.PACKAGE) {
+				packageElement = packageElement.getEnclosingElement();
+				}
+			this.outputPackage = packageElement.toString();
+		}
+
 		this.target = MethodContainer.from(targetStub, targetAnn, null, options);
 	}
 

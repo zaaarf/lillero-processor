@@ -247,12 +247,6 @@ public class LilleroProcessor extends AbstractProcessor {
 			opts
 		);
 
-		// find package information
-		Element packageElement = cl.getEnclosingElement();
-		while(packageElement.getKind() != ElementKind.PACKAGE)
-			packageElement = packageElement.getEnclosingElement();
-		String packageName = packageElement.toString();
-
 		// find annotated elements
 		List<ExecutableElement> targets = findAnnotatedEnclosedElements(cl, Target.class);
 		List<ExecutableElement> injectors = findAnnotatedEnclosedElements(cl, Injector.class);
@@ -352,9 +346,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 			this.injectors.add(writeClass(
 				this.processingEnv.getFiler(),
-				this.options.outputPackage != null
-					? this.options.outputPackage
-					: packageName,
+				injInfo.outputPackage,
 				injInfo.name,
 				injectorClass
 			));
@@ -367,7 +359,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param fqn the fully-qualified name of the class
 	 * @since 0.8.2
 	 */
-	public void generateFakeMixinClasses(String fqn) {
+	private void generateFakeMixinClasses(String fqn) {
 		int lastPeriod = fqn.lastIndexOf('.');
 		String pkg = fqn.substring(0, Math.max(0, lastPeriod));
 		String clazz = fqn.substring(lastPeriod + 1);
