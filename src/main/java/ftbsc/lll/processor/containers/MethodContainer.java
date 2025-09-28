@@ -127,7 +127,7 @@ public class MethodContainer {
 					false,
 					options.env
 				);
-			} else top = findOverloadedMethod(this.parent.elem, this.elem, options.env);
+			} else top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
 			ClassData topParentData = getClassData(
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
 				options.mapper

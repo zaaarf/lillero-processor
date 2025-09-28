@@ -373,16 +373,16 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Tries to find the method being overloaded by the given {@link ExecutableElement}.
-	 * In case of multiple layers of overloading, it finds the original one. In case of
-	 * no overloading, it returns the given method.
+	 * Tries to find the method being overridden by the given {@link ExecutableElement}.
+	 * In case of multiple layers of overriding, it finds the original one. In case of
+	 * no overriding, it returns the given method.
 	 * @param context the {@link TypeElement} representing the parent class
-	 * @param method an {@link ExecutableElement} representing the overloading method
+	 * @param method an {@link ExecutableElement} representing the overriding method
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
-	 * @return the original overloaded method, or the given method if it was not found
+	 * @return the original overridden method, or the given method if it was not found
 	 * @since 0.5.2
 	 */
-	public static ExecutableElement findOverloadedMethod(
+	public static ExecutableElement findOverriddenMethod(
 		TypeElement context,
 		ExecutableElement method,
 		ProcessingEnvironment env
@@ -415,7 +415,7 @@ public class ASTUtils {
 		potentialDeclarers.removeIf(d -> d.getQualifiedName().contentEquals("java.lang.Object"));
 
 		for(TypeElement declarer : potentialDeclarers) {
-			ExecutableElement found = findOverloadedMethod(declarer, method, env);
+			ExecutableElement found = findOverriddenMethod(declarer, method, env);
 			if(!found.equals(method)) {
 				method = found;
 				break;
@@ -442,7 +442,7 @@ public class ASTUtils {
 		ProcessingEnvironment env
 	) throws TargetNotFoundException {
 		TypeElement parent = (TypeElement) method.getEnclosingElement();
-		ExecutableElement overriding = findOverloadedMethod(parent, method, env);
+		ExecutableElement overriding = findOverriddenMethod(parent, method, env);
 		if(descriptorFromExecutableElement(overriding, env).equals(descriptorFromExecutableElement(method, env)))
 			throw new TargetNotFoundException(
 				"bridge method for",
