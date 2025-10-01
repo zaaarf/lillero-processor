@@ -3,6 +3,7 @@ plugins {
 	id 'com.palantir.git-version' version '0.13.0'
 }
 
+group = 'ftbsc.lll'
 archivesBaseName = 'processor'
 version = versionDetails().lastTag
 
