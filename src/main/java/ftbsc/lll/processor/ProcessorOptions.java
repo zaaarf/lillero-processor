@@ -60,7 +60,7 @@ public class ProcessorOptions {
 	 */
 	public final boolean obfuscateInjectorMetadata;
 
-	/**
+	/**f
 	 * Whether the processor should skip the generation of the service provider.
 	 */
 	public final boolean noServiceProvider;

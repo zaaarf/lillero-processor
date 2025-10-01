@@ -83,11 +83,7 @@ public class InjectorInfo {
 			this.outputPackage = options.outputPackage;
 		} else {
 			// fall back on current package
-			Element packageElement = injector.getEnclosingElement();
-			while(packageElement.getKind() != ElementKind.PACKAGE) {
-				packageElement = packageElement.getEnclosingElement();
-				}
-			this.outputPackage = packageElement.toString();
+			this.outputPackage = options.env.getElementUtils().getPackageOf(injector).toString();
 		}
 
 		this.target = MethodContainer.from(targetStub, targetAnn, null, options);

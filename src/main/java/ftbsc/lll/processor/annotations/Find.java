@@ -70,4 +70,14 @@ public @interface Find {
 	 * @see Patch#inner() for details
 	 */
 	String[] typeInner() default {};
+
+	/**
+	 * If true, tells the processor to match this member assuming that it <i>could</i> be implicitly
+	 * inherited and thus not actually present within the target class.
+	 * A proxy obtained this way will match the signature of the member but have the class specified
+	 * by {@link #value()} as parent.
+	 * @return whether to match inherited members
+	 * @since 0.9.2
+	 */
+	boolean inherited() default false;
 }

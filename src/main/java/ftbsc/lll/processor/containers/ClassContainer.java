@@ -89,8 +89,10 @@ public class ClassContainer {
 					skip = true;
 					continue;
 				}
-				if(elem == null)
+
+				if(elem == null) {
 					throw new TargetNotFoundException("class", inner);
+				}
 			}
 		}
 
@@ -142,7 +144,18 @@ public class ClassContainer {
 
 		ClassContainer cl = ClassContainer.from(f, Find::value, f.fqn(), f.inner(), options);
 		return cl.data.name.equals("java/lang/Object")
-			? new ClassContainer(fallback.getQualifiedName().toString(), null, options, false)
+			? describe(fallback, options)
 			: cl;
+	}
+
+	/**
+	 * Creates a {@link ClassContainer} describing hte given {@link TypeElement}.
+	 * @param type the {@link TypeElement} to describe
+	 * @param options the {@link ProcessorOptions} to be used
+	 * @return a {@link ClassContainer} describing the fallback
+	 * @since 0.9.2
+	 */
+	public static ClassContainer describe(TypeElement type, ProcessorOptions options) {
+		return new ClassContainer(type.getQualifiedName().toString(), null, options, false);
 	}
 }

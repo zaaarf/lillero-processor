@@ -58,6 +58,7 @@ public class MethodContainer {
 	 * @param descriptor the descriptor of the target method
 	 * @param unchecked whether the matching should be unchecked (see {@link Target#unchecked()} for more info)
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
+	 * @param inherited whether to match implicitly inherited methods (see {@link Find#inherited()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
 	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
 	 * @param options the {@link ProcessorOptions} to be used
@@ -69,6 +70,7 @@ public class MethodContainer {
 		boolean unchecked,
 		boolean strict,
 		boolean bridge,
+		boolean inherited,
 		ExecutableElement overriddenStub,
 		ProcessorOptions options
 	) {
@@ -84,10 +86,7 @@ public class MethodContainer {
 		} else if(unchecked) {
 			this.elem = null;
 		} else {
-			ExecutableElement tmp = (ExecutableElement) findMember(
-				parent, name, descriptor, strict, false, options.env
-			);
-
+			ExecutableElement tmp = (ExecutableElement) findMember(parent, name, descriptor, strict, inherited, false, options);
 			if(bridge) {
 				this.elem = findSyntheticBridge(tmp, options.env);
 			} else this.elem = tmp;
@@ -124,8 +123,9 @@ public class MethodContainer {
 					overriddenStub.getSimpleName().toString(),
 					o.strict() ? descriptorFromExecutableElement(overriddenStub, options.env) : null,
 					o.strict(),
+					inherited,
 					false,
-					options.env
+					options
 				);
 			} else top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
 			ClassData topParentData = getClassData(
@@ -190,6 +190,7 @@ public class MethodContainer {
 			t.unchecked(),
 			t.strict(),
 			t.bridge(),
+			f != null && f.inherited(),
 			findOverriddenStub(stub),
 			opts
 		);
@@ -200,7 +201,7 @@ public class MethodContainer {
 	 * @param stub the stub to look for info
 	 * @return the {@link Overridden} stub, or null if not found
 	 */
-	public static ExecutableElement findOverriddenStub(ExecutableElement stub) {
+	private static ExecutableElement findOverriddenStub(ExecutableElement stub) {
 		List<ExecutableElement> elements = stub.getEnclosingElement().getEnclosedElements().stream()
 			.filter(e -> e instanceof ExecutableElement)
 			.map(e -> (ExecutableElement) e)

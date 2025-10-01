@@ -5,6 +5,8 @@ import ftbsc.lll.mapper.utils.Mapper;
 import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.data.FieldData;
 import ftbsc.lll.mapper.data.MethodData;
+import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.proxies.ProxyType;
@@ -284,6 +286,139 @@ public class ASTUtils {
 	}
 
 	/**
+	 * Finds a potentially inherited member.
+	 * @param parent the {@link ClassContainer} representing the parent
+	 * @param name the name to search for
+	 * @param descr the descriptor to search for, or null if it's not a method
+	 * @param strict whether to perform lookup in strict mode (see {@link Target#strict()} for more info)
+	 * @param inherited whether to match implicitly inherited fields (see {@link Find#inherited()} for more info)
+	 * @param field whether the member being searched is a field
+	 * @param options the {@link ProcessorOptions} to be used
+	 * @return the desired member, if it exists
+	 * @throws AmbiguousDefinitionException if it finds more than one candidate
+	 * @throws TargetNotFoundException if it finds no valid candidate
+	 * @since 0.9.2
+	 */
+	public static Element findMember(
+		ClassContainer parent,
+		String name,
+		String descr,
+		boolean strict,
+		boolean inherited,
+		boolean field,
+		ProcessorOptions options
+	) {
+		if(parent.elem == null && inherited) {
+			throw new UntraceableInheritanceException(parent);
+		}
+
+		ClassContainer parentCursor = parent;
+		while(true) {
+			try {
+				Element found = findMember0(parentCursor, name, descr, strict, field, options.env);
+				if(isAccessibleFrom(found, parent.elem, options.env)) {
+					return found;
+				} else {
+					throw new UntraceableInheritanceException(parentCursor, found, parent);
+				}
+			} catch(TargetNotFoundException ex) {
+				if(!inherited) throw ex; // if inheritance is off, abort immediately
+				if(parentCursor.elem.getSuperclass().getKind().equals(TypeKind.NONE)) {
+					// stop recursion, nothing was found
+					throw new TargetNotFoundException(
+						String.format("inherited %s", field ? "field" : "method"),
+						String.format("%s with descriptor %s", name, descr),
+						parent.data.name
+					);
+				} else {
+					parentCursor = ClassContainer.describe(
+						(TypeElement) options.env.getTypeUtils().asElement(parentCursor.elem.getSuperclass()),
+						options
+					);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Checks that a given {@link Element} is accessible from a certain {@link TypeElement} context.
+	 * @param member the {@link Element} to check
+	 * @param from the {@link TypeElement} to try and access from
+	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @return true if it was accessible
+	 * @since 0.9.2
+	 */
+	public static boolean isAccessibleFrom(Element member, TypeElement from, ProcessingEnvironment env) {
+		if(member instanceof PackageElement) {
+			return true;
+		}
+
+		// check visibility of enclosing member
+		Element enclosing = member.getEnclosingElement();
+		if(enclosing instanceof TypeElement || enclosing instanceof PackageElement) {
+			if(!isAccessibleFrom(enclosing, from, env)) {
+				return false; // enclosing type not visible => member not visible
+			}
+		} else { // only types and packages may have externally visible children
+			return false;
+		}
+
+		Set<Modifier> mods = member.getModifiers();
+		if(mods.contains(Modifier.PUBLIC)) { // public is always visible
+			return true;
+		}
+
+		PackageElement memberPkg = env.getElementUtils().getPackageOf(member);
+		PackageElement fromPkg = env.getElementUtils().getPackageOf(from);
+
+		// private is only visible if they are in the same top-level non-package
+		if(mods.contains(Modifier.PRIVATE)) {
+			return getTopLevel(enclosing).equals(getTopLevel(from));
+		}
+
+		// protected is visible in the same package or within a subclass
+		if(mods.contains(Modifier.PROTECTED)) {
+			if(memberPkg.equals(fromPkg)) {
+				return true;
+			}
+
+			if(enclosing instanceof TypeElement) {
+				TypeMirror enclosingType = enclosing.asType();
+				TypeElement cursor = from;
+				while(cursor != null) {
+					if(env.getTypeUtils().isSubtype(cursor.asType(), enclosingType)) {
+						// either TypeMirror is a subtype or is within a subtype
+						return true;
+					}
+
+					Element parent = cursor.getEnclosingElement();
+					cursor = (parent instanceof TypeElement)
+						? (TypeElement) parent
+						: null;
+				}
+			}
+			return false;
+		}
+
+		// package-private
+		return memberPkg.equals(fromPkg);
+	}
+
+	/**
+	 * Finds the top-level class of a given {@link Element}.
+	 * The parent of this is guaranteed to be a {@link PackageElement}.
+	 * @param e the {@link Element} to look it up for
+	 * @return the top-level containing class
+	 * @since 0.9.2
+	 */
+	public static Element getTopLevel(Element e) {
+		while(e.getEnclosingElement() != null && e.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
+			e = e.getEnclosingElement();
+		}
+		return e;
+	}
+
+	/**
 	 * Finds a member given the name, the container class and (if it's a method) the descriptor.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the name to search for
@@ -296,7 +431,7 @@ public class ASTUtils {
 	 * @throws TargetNotFoundException if it finds no valid candidate
 	 * @since 0.3.0
 	 */
-	public static Element findMember(
+	private static Element findMember0(
 		ClassContainer parent,
 		String name,
 		String descr,

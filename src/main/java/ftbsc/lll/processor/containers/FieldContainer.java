@@ -55,9 +55,16 @@ public class FieldContainer {
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the fully-qualified name of the target field
 	 * @param descriptor the descriptor of the target field, may be null for verifiable fields
+	 * @param inherited whether to match implicitly inherited fields (see {@link Find#inherited()} for more info)
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
-	private FieldContainer(ClassContainer parent, String name, String descriptor, ProcessorOptions options) {
+	private FieldContainer(
+		ClassContainer parent,
+		String name,
+		String descriptor,
+		boolean inherited,
+		ProcessorOptions options
+	) {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
 			if(descriptor == null)
@@ -65,7 +72,7 @@ public class FieldContainer {
 			this.elem = null;
 			this.descriptor = descriptor;
 		} else {
-			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, true, options.env);
+			this.elem = (VariableElement) findMember(parent, name, descriptor, descriptor != null, inherited, true, options);
 			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
 			name = this.elem.getSimpleName().toString();
 		}
@@ -114,6 +121,6 @@ public class FieldContainer {
 			} else descriptor = descriptorFromType(fieldType, opts.env);
 		}
 
-		return new FieldContainer(parent, name, descriptor, opts);
+		return new FieldContainer(parent, name, descriptor, f.inherited(), opts);
 	}
 }
