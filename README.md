@@ -158,6 +158,13 @@ An attempt will _still_ be made to validate the given FQN and lookup the class; 
 but it will otherwise function normally using the given FQN. Logically, if validation fields, no method or field of the
 class will be validated either.
 
+### Implicit inheritance
+Sometimes, a method or field will be *implicitly inherited*: declared in a superclass, but not overridden in the target
+class. Instructions like `GETFIELD` and the various `INVOKE`, however, *want* to treat it as if it was a member of the
+local class rather than the parent.
+
+You can obtain a proxy for that use by setting `inherited` to `true` within the `@Find` annotation.
+
 ### Hybrid setups
 Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these
 cases, you don't want to create the service provider (the `META-INF/services/ftbsc.lll.IInjector` file) yourself, to 
