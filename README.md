@@ -27,8 +27,8 @@ public class SamplePatch implements IInjector {
 	public String name()		{ return "SamplePatch"; }
 	public String reason()      { return "crash the game as soon as it loads"; }
 	public String targetClass() { return "net.minecraft.client.Minecraft"; }
-	public String methodName()	{ return "func_71407_l"; } //Searge name for tick()
-	public String methodDesc()	{ return "()V"; } //void, no args
+	public String methodName()	{ return "func_71407_l"; } // Searge name for tick()
+	public String methodDesc()	{ return "()V"; } // void, no args
 	public void inject(ClassNode clazz, MethodNode main) {
 		InsnList insnList = new InsnList();
 		insnList.add(new InsnNode(POP));
@@ -167,7 +167,7 @@ avoid conflicts. Simply add the annotation `@BareInjector` on top of the IInject
 You may pass a mappings file to the processor by adding this to your `build.gradle`:
 
 ```groovy
-compileJava { //mappings for lillero-processor
+compileJava { // mappings for lillero-processor
 	options.compilerArgs << '-AmappingsFile=remote_url_or_local_path'
 }
 ```

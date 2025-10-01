@@ -18,8 +18,8 @@ import java.lang.annotation.RetentionPolicy;
 @java.lang.annotation.Target({ElementType.FIELD, ElementType.PARAMETER})
 public @interface Find {
 	/**
-	 * @return the {@link Class} object containing the target; the annotation's parent
-	 *         class is instead used
+	 * @return the {@link Class} object containing the target;
+	 *         falls back on the annotation's parent when unset
 	 * @since 0.5.0
 	 */
 	Class<?> value() default Object.class;
@@ -32,22 +32,17 @@ public @interface Find {
 	String fqn() default "";
 
 	/**
-	 * For a {@link TypeProxy}, this refers to the target itself rather than its parent.
-	 * @return the name of the inner class that contains the target
+	 * @return the name of the inner class that contains the target or, for a {@link TypeProxy},
+	 *         the target itself rather than its parent
 	 * @see Patch#inner() for details
 	 * @since 0.5.0
 	 */
 	String[] inner() default {};
 
 	/**
-	 * For a {@link FieldProxy}, this is the name of the field to find. If omitted,
-	 * it will fall back on the name of the annotated field.
-	 * For a {@link MethodProxy} it indicates an attempt to match by name only, with
-	 * this name. This will issue a warning unless warnings are disabled. It will fail
-	 * and throw an exception if multiple methods with that name are found in the
-	 * relevant class. It is generally recommended that you use a {@link Target} stub
-	 * for methods, as this can lead to unpredictable behaviour at runtime.
-	 * It will have no effect on a {@link TypeProxy}.
+	 * Sets the name of the field to find; if omitted, it will fall back on the name of
+	 * the annotated field.
+	 * This is only meaningful in {@link FieldProxy FieldProxies}.
 	 * @return the name of the target, will default to the empty string (the name of
 	 *         the annotated method will instead be used)
 	 * @since 0.5.0
@@ -57,6 +52,7 @@ public @interface Find {
 	/**
 	 * This overrules a field type. Only to be used in the case (such as in fields of
 	 * anonymous classes) of fields whose parents cannot be reached at processing time.
+	 * This is only meaningful in {@link FieldProxy FieldProxies}.
 	 * @return a {@link Class} representing the type
 	 */
 	Class<?> type() default Object.class;
