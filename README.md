@@ -160,10 +160,10 @@ class will be validated either.
 
 ### Implicit inheritance
 Sometimes, a method or field will be *implicitly inherited*: declared in a superclass, but not overridden in the target
-class. Instructions like `GETFIELD` and the various `INVOKE`, however, *want* to treat it as if it was a member of the
-local class rather than the parent.
+class.
 
-You can obtain a proxy for that use by setting `inherited` to `true` within the `@Find` annotation.
+By default, the processor will include these for the purpose of building a proxy with `@Find`. You can disable this
+by setting `inherited` to `false` within the `@Find` annotation.
 
 ### Hybrid setups
 Sometimes, you may want to manually write IInjectors yourself in a project which also uses the processor. In these

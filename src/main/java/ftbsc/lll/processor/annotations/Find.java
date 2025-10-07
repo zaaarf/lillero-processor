@@ -79,5 +79,5 @@ public @interface Find {
 	 * @return whether to match inherited members
 	 * @since 0.9.2
 	 */
-	boolean inherited() default false;
+	boolean inherited() default true;
 }
