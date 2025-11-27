@@ -43,7 +43,7 @@ The simplified version looks like this:
 @Patch(Minecraft.class)
 public abstract class SamplePatch {
 	@Target(of = "injectorName")
-	abstract void tick();
+	protected abstract void tick();
 
 	@Injector(reason = "crash the game as soon as it loads")
 	public void injectorName(ClassNode clazz, MethodNode main) {
