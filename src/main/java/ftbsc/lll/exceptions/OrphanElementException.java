@@ -3,7 +3,6 @@ package ftbsc.lll.exceptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.QualifiedNameable;
 import java.util.ArrayDeque;
-import java.util.Queue;
 
 /**
  * Thrown when an annotated element that needs to be paired with
@@ -24,7 +23,7 @@ public class OrphanElementException extends RuntimeException {
 		Element cur = element;
 		while(!(cur instanceof QualifiedNameable)) {
 			name.push(cur.getSimpleName().toString());
-			cur = element.getEnclosingElement();
+			cur = cur.getEnclosingElement();
 		}
 
 		return ((QualifiedNameable) cur).getQualifiedName().toString()
