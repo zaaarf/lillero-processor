@@ -1,10 +1,11 @@
 package ftbsc.lll.processor.containers;
 
-import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.reporting.MemberType;
 
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
@@ -51,7 +52,7 @@ public class ClassContainer {
 					);
 				}
 			} else {
-				throw new TargetNotFoundException("class", fqn);
+				throw ErrorReporter.notFound(MemberType.CLASS, fqn, null);
 			}
 		}
 
@@ -91,7 +92,7 @@ public class ClassContainer {
 				}
 
 				if(elem == null) {
-					throw new TargetNotFoundException("class", inner);
+					throw ErrorReporter.notFound(MemberType.CLASS, fqnBuilder.toString(), null);
 				}
 			}
 		}
@@ -149,7 +150,7 @@ public class ClassContainer {
 	}
 
 	/**
-	 * Creates a {@link ClassContainer} describing hte given {@link TypeElement}.
+	 * Creates a {@link ClassContainer} describing the given {@link TypeElement}.
 	 * @param type the {@link TypeElement} to describe
 	 * @param options the {@link ProcessorOptions} to be used
 	 * @return a {@link ClassContainer} describing the fallback

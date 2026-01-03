@@ -2,12 +2,12 @@ package ftbsc.lll.processor;
 
 import com.squareup.javapoet.*;
 import ftbsc.lll.IInjector;
-import ftbsc.lll.exceptions.OrphanElementException;
 import ftbsc.lll.processor.annotations.*;
 import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.processor.containers.FinderInfo;
 import ftbsc.lll.processor.containers.InjectorInfo;
 import ftbsc.lll.processor.containers.MethodContainer;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.utils.ASTUtils;
 import ftbsc.lll.proxies.ProxyType;
 
@@ -36,37 +36,26 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
 	 * of the generated injector files.
 	 */
-	private final Set<String> injectors = new HashSet<>();
+	public final Set<String> injectors = new HashSet<>();
 
 	/**
 	 * A {@link Map} of {@link ClassName}s representing the classes that
 	 * are being targeted; the value is a boolean that determines whether
 	 * this is to be added as a class or as a string.
 	 */
-	private final Map<ClassName, Boolean> targets = new HashMap<>();
+	public final Map<ClassName, Boolean> targets = new HashMap<>();
 
-	/**
-	 * An object representing the various options passed to the processor.
-	 */
-	private ProcessorOptions options = null;
-
-	/**
-	 * Method overriding default implementation to manually pass supported options.
-	 * @return a {@link Set} of options supported by this processor.
-	 */
 	@Override
 	public Set<String> getSupportedOptions() {
 		return ProcessorOptions.SUPPORTED;
 	}
 
-	/**
-	 * Always returns the latest version since this should never break.
-	 * @return the latest version
-	 */
 	@Override
 	public SourceVersion getSupportedSourceVersion() {
 		return SourceVersion.latest();
 	}
+
+	private ProcessorOptions options = null;
 
 	/**
 	 * Returns the {@link ProcessorOptions} for this instance, creating the object if
@@ -78,30 +67,24 @@ public class LilleroProcessor extends AbstractProcessor {
 		return this.options;
 	}
 
-	/**
-	 * Where the actual processing happens.
-	 * It filters through whatever annotated class it's fed, and checks whether it contains
-	 * the required information. It then generates injectors and a service provider for every
-	 * remaining class.
-	 * @see LilleroProcessor#isValidInjector(TypeElement)
-	 * @param annotations the annotation types requested to be processed
-	 * @param roundEnv environment for information about the current and prior round
-	 * @return whether the set of annotation types are claimed by this processor
-	 */
 	@Override
 	public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 		ProcessorOptions options = this.getProcessorOptions();
 		for(TypeElement annotation : annotations) {
 			if(annotation.getQualifiedName().contentEquals(Patch.class.getName())) {
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
-					TypeElement type = (TypeElement) e;
-					if(options.fakeMixin != null && e.getAnnotation(BareInjector.class) != null) {
-						this.markClassAsTarget(type);
-					} else if(this.isValidInjector(type)) {
-						this.generateClasses(type);
-						if(options.fakeMixin != null) {
+					try {
+						TypeElement type = (TypeElement) e;
+						if(options.fakeMixin != null && e.getAnnotation(BareInjector.class) != null) {
 							this.markClassAsTarget(type);
+						} else if(this.isValidInjector(type)) {
+							this.generateClasses(type);
+							if(options.fakeMixin != null) {
+								this.markClassAsTarget(type);
+							}
 						}
+					} catch(RuntimeException ex) {
+						ErrorReporter.handleRuntimeException(this.processingEnv, ex, e);
 					}
 				}
 			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
@@ -121,7 +104,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		}
 
 		if(options.fakeMixin != null && !this.injectors.isEmpty()) {
-			this.generateFakeMixinClasses(options.fakeMixin);
+			this.generateFakeMixinClass(options.fakeMixin);
 		}
 
 		if(!options.noServiceProvider && !this.injectors.isEmpty()) {
@@ -137,7 +120,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param elem the element to check.
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
-	private boolean isValidInjector(TypeElement elem) {
+	public boolean isValidInjector(TypeElement elem) {
 		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
 		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
 		if(
@@ -193,7 +176,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Marks the given class as a "target" for purposes of generating the fake mixin.
 	 * @param type the class in question
 	 */
-	private void markClassAsTarget(TypeElement type) {
+	public void markClassAsTarget(TypeElement type) {
 		Patch ann = type.getAnnotation(Patch.class);
 
 		boolean asClass = ann.fqn().isEmpty();
@@ -235,7 +218,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Basically implements the {@link IInjector} interface for you.
 	 * @param cl the {@link TypeElement} for the given class
 	 */
-	private void generateClasses(TypeElement cl) {
+	public void generateClasses(TypeElement cl) {
 		// find class information
 		Patch patchAnn = cl.getAnnotation(Patch.class);
 		ProcessorOptions opts = this.getProcessorOptions();
@@ -304,10 +287,10 @@ public class LilleroProcessor extends AbstractProcessor {
 		// find orphans, throw exception if any are found
 		for(ExecutableElement e : injectors)
 			if(!toGenerate.containsKey(e))
-				throw new OrphanElementException(e);
+				throw ErrorReporter.orphan(e);
 		for(VariableElement e : finders)
 			if(!matchedFinders.containsKey(e))
-				throw new OrphanElementException(e);
+				throw ErrorReporter.orphan(e);
 
 		// register parameter finders or generate constructor initializers
 		for(FinderInfo info : matchedFinders.values()) {
@@ -316,7 +299,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				if(injInfo != null) {
 					injInfo.finderParams.add(info);
 				} else {
-					throw new OrphanElementException(info.proxy);
+					throw ErrorReporter.orphan(info.proxy);
 				}
 			} else {
 				info.appendToMethodSpec(constructorBuilder, false, this.options);
@@ -359,7 +342,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @param fqn the fully-qualified name of the class
 	 * @since 0.8.2
 	 */
-	private void generateFakeMixinClasses(String fqn) {
+	public void generateFakeMixinClass(String fqn) {
 		int lastPeriod = fqn.lastIndexOf('.');
 		String pkg = fqn.substring(0, Math.max(0, lastPeriod));
 		String clazz = fqn.substring(lastPeriod + 1);
@@ -396,7 +379,7 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Generates the Service Provider file for the generated injectors.
 	 */
-	private void generateServiceProvider() {
+	public void generateServiceProvider() {
 		try {
 			FileObject serviceProvider = this.processingEnv.getFiler().createResource(
 				StandardLocation.CLASS_OUTPUT,

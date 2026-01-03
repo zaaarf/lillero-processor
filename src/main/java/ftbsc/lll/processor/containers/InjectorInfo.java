@@ -3,7 +3,7 @@ package ftbsc.lll.processor.containers;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
-import ftbsc.lll.exceptions.OrphanElementException;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
@@ -121,7 +121,7 @@ public class InjectorInfo {
 			if(param.asType().equals(classNode)) sb.append("clazz,");
 			else if(param.asType().equals(methodNode)) sb.append("method,");
 			else if(finderMap.containsKey(param)) sb.append(param.getSimpleName().toString()).append(",");
-			else throw new OrphanElementException(param);
+			else throw ErrorReporter.orphan(param);
 		}
 
 		injectBuilder.addStatement(

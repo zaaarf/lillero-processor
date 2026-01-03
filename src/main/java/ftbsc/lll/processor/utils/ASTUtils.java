@@ -5,10 +5,13 @@ import ftbsc.lll.mapper.utils.Mapper;
 import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.data.FieldData;
 import ftbsc.lll.mapper.data.MethodData;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.containers.ClassContainer;
+import ftbsc.lll.processor.reporting.MemberType;
+import ftbsc.lll.processor.reporting.Reportable;
 import ftbsc.lll.proxies.ProxyType;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -19,7 +22,6 @@ import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -286,61 +288,6 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Finds a potentially inherited member.
-	 * @param parent the {@link ClassContainer} representing the parent
-	 * @param name the name to search for
-	 * @param descr the descriptor to search for, or null if it's not a method
-	 * @param strict whether to perform lookup in strict mode (see {@link Target#strict()} for more info)
-	 * @param inherited whether to match implicitly inherited fields (see {@link Find#inherited()} for more info)
-	 * @param field whether the member being searched is a field
-	 * @param options the {@link ProcessorOptions} to be used
-	 * @return the desired member, if it exists
-	 * @throws AmbiguousDefinitionException if it finds more than one candidate
-	 * @throws TargetNotFoundException if it finds no valid candidate
-	 * @since 0.9.2
-	 */
-	public static Element findMember(
-		ClassContainer parent,
-		String name,
-		String descr,
-		boolean strict,
-		boolean inherited,
-		boolean field,
-		ProcessorOptions options
-	) {
-		if(parent.elem == null && inherited) {
-			throw new UntraceableInheritanceException(parent);
-		}
-
-		ClassContainer parentCursor = parent;
-		while(true) {
-			try {
-				Element found = findMember0(parentCursor, name, descr, strict, field, options.env);
-				if(isAccessibleFrom(found, parent.elem, options.env)) {
-					return found;
-				} else {
-					throw new UntraceableInheritanceException(parentCursor, found, parent);
-				}
-			} catch(TargetNotFoundException ex) {
-				if(!inherited) throw ex; // if inheritance is off, abort immediately
-				if(parentCursor.elem.getSuperclass().getKind().equals(TypeKind.NONE)) {
-					// stop recursion, nothing was found
-					throw new TargetNotFoundException(
-						String.format("inherited %s", field ? "field" : "method"),
-						String.format("%s with descriptor %s", name, descr),
-						parent.data.name
-					);
-				} else {
-					parentCursor = ClassContainer.describe(
-						(TypeElement) options.env.getTypeUtils().asElement(parentCursor.elem.getSuperclass()),
-						options
-					);
-				}
-			}
-		}
-	}
-
-	/**
 	 * Checks that a given {@link Element} is accessible from a certain {@link TypeElement} context.
 	 * @param member the {@link Element} to check
 	 * @param from the {@link TypeElement} to try and access from
@@ -419,30 +366,74 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Finds a member given the name, the container class and (if it's a method) the descriptor.
+	 * Finds a potentially inherited member.
 	 * @param parent the {@link ClassContainer} representing the parent
 	 * @param name the name to search for
 	 * @param descr the descriptor to search for, or null if it's not a method
-	 * @param strict whether to perform lookup in strict mode (see {@link Target#strict()} for more information)
+	 * @param strict whether to perform lookup in strict mode (see {@link Target#strict()} for more info)
+	 * @param inherited whether to match implicitly inherited fields (see {@link Find#inherited()} for more info)
 	 * @param field whether the member being searched is a field
-	 * @param env the {@link ProcessingEnvironment} to perform the operation in
+	 * @param options the {@link ProcessorOptions} to be used
 	 * @return the desired member, if it exists
-	 * @throws AmbiguousDefinitionException if it finds more than one candidate
-	 * @throws TargetNotFoundException if it finds no valid candidate
-	 * @since 0.3.0
+	 * @throws Reportable if an error occurs
+	 * @since 0.9.2
 	 */
+	public static Element findMember(
+		ClassContainer parent,
+		String name,
+		String descr,
+		boolean strict,
+		boolean inherited,
+		boolean field,
+		ProcessorOptions options
+	) {
+		if(parent.elem == null) {
+			if(inherited) {
+				throw ErrorReporter.untraceableInheritance(parent);
+			} else {
+				throw ErrorReporter.notFound("parent", MemberType.CLASS, parent.data.name);
+			}
+		}
+
+		ClassContainer parentCursor = parent;
+		while(true) {
+			Element found = findMember0(parentCursor, name, descr, strict, field, !inherited, options.env);
+			if(found == null) {
+				if(!parentCursor.elem.getSuperclass().getKind().equals(TypeKind.DECLARED)) {
+					throw ErrorReporter.notFound(
+						"inherited",
+						field ? MemberType.FIELD : MemberType.METHOD,
+						name,
+						descr,
+						parent.data.name
+					);
+				}
+
+				parentCursor = ClassContainer.describe(
+					(TypeElement) options.env.getTypeUtils().asElement(parentCursor.elem.getSuperclass()),
+					options
+				);
+
+				continue;
+			}
+
+			if(isAccessibleFrom(found, parent.elem, options.env)) {
+				return found;
+			} else {
+				throw ErrorReporter.untraceableInheritance(parentCursor, found, parent);
+			}
+		}
+	}
+
 	private static Element findMember0(
 		ClassContainer parent,
 		String name,
 		String descr,
 		boolean strict,
 		boolean field,
+		boolean throwOnNotFound, // if false just return null
 		ProcessingEnvironment env
 	) {
-		if(parent.elem == null) {
-			throw new TargetNotFoundException("parent class", parent.data.name);
-		}
-
 		// try to find by name
 		List<Element> candidates = parent.elem.getEnclosedElements()
 			.stream()
@@ -451,7 +442,15 @@ public class ASTUtils {
 			.collect(Collectors.toList());
 
 		if(candidates.isEmpty()) {
-			throw new TargetNotFoundException(field ? "field" : "method", name, parent.data.name);
+			if(throwOnNotFound) {
+				throw ErrorReporter.notFound(
+					field ? MemberType.FIELD : MemberType.METHOD,
+					name,
+					parent.data.name
+				);
+			} else {
+				return null;
+			}
 		}
 
 		if(candidates.size() == 1 && (!strict || descr == null)) {
@@ -459,20 +458,22 @@ public class ASTUtils {
 		}
 
 		if(descr == null) {
-			throw new AmbiguousDefinitionException(String.format(
-				"Found %d members named %s in class %s!",
+			throw ErrorReporter.ambiguousLookup(
+				field ? MemberType.FIELD : MemberType.METHOD,
 				candidates.size(),
 				name,
 				parent.data.name
-			));
+			);
 		} else {
 			if(field) {
 				// fields can verify the signature for extra safety
 				// but there can only be 1 field with a given name
 				if(!descriptorFromType(candidates.get(0).asType(), env).equals(descr)) {
-					throw new TargetNotFoundException(
-						"field",
-						String.format("%s with descriptor %s", name, descr),
+					throw ErrorReporter.notFound(
+						null,
+						MemberType.FIELD,
+						name,
+						descr,
 						parent.data.name
 					);
 				}
@@ -488,20 +489,22 @@ public class ASTUtils {
 			}
 
 			if(candidates.isEmpty()) {
-				throw new TargetNotFoundException(
-					"method",
-					String.format("%s %s", name, descr),
+				throw ErrorReporter.notFound(
+					null,
+					MemberType.METHOD,
+					name,
+					descr,
 					parent.data.name
 				);
 			}
 
 			if(candidates.size() > 1) {
-				throw new AmbiguousDefinitionException(String.format(
-					"Found %d methods named %s in class %s!",
+				throw ErrorReporter.ambiguousLookup(
+					MemberType.METHOD,
 					candidates.size(),
 					name,
 					parent.data.name
-				));
+				);
 			}
 			return candidates.get(0);
 		}
@@ -568,23 +571,26 @@ public class ASTUtils {
 	 * @param method an {@link ExecutableElement} the (potentially) bridged method
 	 * @param env the {@link ProcessingEnvironment} to perform the operation in
 	 * @return the "bridge", or null if not found
-	 * @throws TargetNotFoundException if the method in question was not overriding anything, or
-	 * 																 if the method it was overriding does not require a bridge
+	 * @throws Reportable if an error occurs
 	 * @since 0.5.2
 	 */
 	public static ExecutableElement findSyntheticBridge(
 		ExecutableElement method,
 		ProcessingEnvironment env
-	) throws TargetNotFoundException {
+	) {
 		TypeElement parent = (TypeElement) method.getEnclosingElement();
 		ExecutableElement overriding = findOverriddenMethod(parent, method, env);
-		if(descriptorFromExecutableElement(overriding, env).equals(descriptorFromExecutableElement(method, env)))
-			throw new TargetNotFoundException(
-				"bridge method for",
+		if(descriptorFromExecutableElement(overriding, env).equals(descriptorFromExecutableElement(method, env))) {
+			throw ErrorReporter.notFound(
+				"bridge",
+				MemberType.METHOD,
 				overriding.getSimpleName().toString(),
+				null,
 				parent.getQualifiedName().toString()
 			);
-		else return overriding;
+		} else {
+			return overriding;
+		}
 	}
 
 	/**
@@ -592,7 +598,7 @@ public class ASTUtils {
 	 * It will fail if the return type is not a known type of proxy.
 	 * @param v the annotated {@link VariableElement}
 	 * @return the {@link ProxyType} for the element
-	 * @throws NotAProxyException if it's neither
+	 * @throws Reportable if it's not a known type
 	 * @since 0.4.0
 	 */
 	public static ProxyType getProxyType(VariableElement v) {
@@ -607,30 +613,18 @@ public class ASTUtils {
 			case "ftbsc.lll.proxies.impl.PackageProxy":
 				return ProxyType.PACKAGE;
 			default:
-				throw new NotAProxyException(v.getEnclosingElement().getSimpleName().toString(), v.getSimpleName().toString());
+				throw ErrorReporter.notAProxy(v);
 		}
 	}
 
 	/**
-	 * A pattern for efficiently recognising numeric strings.
-	 * @since 0.7.0
-	 */
-	private final static Pattern NUMERIC = Pattern.compile("^[0-9]+$");
-
-	/**
-	 * Checks whether a certain class name is valid, and whether the processor is able to validate
-	 * its existence.
+	 * Checks whether a certain type identifier can be validated by the processor.
 	 * @param name the name to validate
-	 * @return true if it's a valid class name, false if it's an anonymous class identifier
-	 * @throws InvalidClassNameException if an invalid name was provided
+	 * @return true if it can be validated, false otherwise
 	 * @since 0.7.0
 	 */
-	public static boolean shouldValidate(String name) throws InvalidClassNameException {
-		if(SourceVersion.isIdentifier(name) && !SourceVersion.isKeyword(name)) {
-			return true; // if it's a valid name, proceed
-		} else if(NUMERIC.matcher(name).matches()) {
-			return false;
-		} else throw new InvalidClassNameException(name);
+	public static boolean shouldValidate(String name) {
+		return SourceVersion.isIdentifier(name) && !SourceVersion.isKeyword(name);
 	}
 
 	/**
@@ -644,7 +638,7 @@ public class ASTUtils {
 	 * @return a {@link ExecutableElement} if an injector was matched,
 	 *         a {@link VariableElement} if a finder was matched,
 	 *         or null if this was an orphan
-	 * @throws AmbiguousDefinitionException if the definition is ambiguous
+	 * @throws Reportable if something goes wrong
 	 */
 	public static Element matchTarget(
 		TypeElement parent,
@@ -667,10 +661,9 @@ public class ASTUtils {
 				.collect(Collectors.toList());
 
 		// throw exception if user is a moron and defined a finder and an injector with the same name
+		int candidates = finderCandidates.size() + injectorCandidates.size();
 		if(!finderCandidates.isEmpty() && !injectorCandidates.isEmpty()) {
-			throw new AmbiguousDefinitionException(
-				String.format("Target specified user %s, but name was used by both a finder and injector.", targetAnn.of())
-			);
+			throw ErrorReporter.ambiguousOf(targetAnn.of(), candidates);
 		} else if(finderCandidates.isEmpty() && injectorCandidates.isEmpty()) {
 			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 				String.format(
@@ -682,13 +675,9 @@ public class ASTUtils {
 			);
 			return null;
 		} else if(finderCandidates.isEmpty() && injectorCandidates.size() != 1) {
-			throw new AmbiguousDefinitionException(
-				String.format("Found multiple candidate injectors for target %s::%s!", parent.getSimpleName(), target.getSimpleName())
-			);
+			throw ErrorReporter.ambiguousOf(targetAnn.of(), candidates);
 		} else if(injectorCandidates.isEmpty() && finderCandidates.size() != 1) {
-			throw new AmbiguousDefinitionException(
-				String.format("Found multiple candidate finders for target %s::%s!", parent.getSimpleName(), target.getSimpleName())
-			);
+			throw ErrorReporter.ambiguousOf(targetAnn.of(), candidates);
 		} else {
 			if(injectorCandidates.size() == 1) {
 				return injectorCandidates.get(0);

@@ -1,7 +1,6 @@
 package ftbsc.lll.processor.containers;
 
-import ftbsc.lll.exceptions.AmbiguousDefinitionException;
-import ftbsc.lll.exceptions.TargetNotFoundException;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.mapper.utils.MappingUtils;
 import ftbsc.lll.mapper.data.MethodData;
@@ -10,9 +9,10 @@ import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.reporting.MemberType;
+import ftbsc.lll.processor.reporting.Reportable;
 
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.QualifiedNameable;
 import javax.lang.model.element.TypeElement;
 
 import java.util.List;
@@ -79,9 +79,7 @@ public class MethodContainer {
 			if(unchecked || strict) {
 				this.elem = null;
 			} else {
-				throw new AmbiguousDefinitionException(
-					"Cannot use name-based lookups for methods of unverifiable classes!"
-				);
+				throw ErrorReporter.badNameBasedLookup(MemberType.METHOD);
 			}
 		} else if(unchecked) {
 			this.elem = null;
@@ -165,8 +163,7 @@ public class MethodContainer {
 	 * @param f the {@link Find} annotation containing fallback data, may be null
 	 * @param opts the {@link ProcessorOptions} to be used
 	 * @return the {@link MethodContainer} corresponding to the method
-	 * @throws AmbiguousDefinitionException if it finds more than one candidate
-	 * @throws TargetNotFoundException if it finds no valid candidate
+	 * @throws Reportable if something goes wrong
 	 * @since 0.3.0
 	 */
 	public static MethodContainer from(
@@ -222,11 +219,7 @@ public class MethodContainer {
 			case 1:
 				return elements.get(0);
 			default:
-				throw new AmbiguousDefinitionException(String.format(
-					"Found multiple @Overridden methods for stub %s.%s!",
-					((QualifiedNameable) stub.getEnclosingElement()).getQualifiedName().toString(),
-					stub.getSimpleName().toString()
-				));
+				throw ErrorReporter.ambiguousOverridden(stub);
 		}
 	}
 }

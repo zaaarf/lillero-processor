@@ -1,11 +1,12 @@
 package ftbsc.lll.processor.containers;
 
-import ftbsc.lll.exceptions.AmbiguousDefinitionException;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.mapper.utils.MappingUtils;
 import ftbsc.lll.mapper.data.FieldData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.reporting.MemberType;
 import org.objectweb.asm.Type;
 
 import javax.lang.model.element.ExecutableElement;
@@ -68,7 +69,7 @@ public class FieldContainer {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
 			if(descriptor == null)
-				throw new AmbiguousDefinitionException("Cannot use name-based lookups for fields of unverifiable classes!");
+				throw ErrorReporter.badNameBasedLookup(MemberType.FIELD);
 			this.elem = null;
 			this.descriptor = descriptor;
 		} else {
