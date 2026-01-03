@@ -1,9 +1,11 @@
 package ftbsc.lll.processor.utils;
 
 import com.squareup.javapoet.*;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 
-import javax.annotation.processing.Filer;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
+import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashSet;
@@ -71,20 +73,28 @@ public class JavaPoetUtils {
 
 	/**
 	 * Writes a Java source file from a JavaPoet spec.
-	 * @param filer the processing environment's {@link Filer}
+	 * @param env the processing environment
 	 * @param pkg the package to output this to
 	 * @param name the simple name of the class
 	 * @param spec the {@link TypeSpec} for it
 	 * @return the fully qualified name of the written class
 	 * @since 0.8.2
 	 */
-	public static String writeClass(Filer filer, String pkg, String name, TypeSpec spec) {
+	public static String writeClass(ProcessingEnvironment env, String pkg, String name, TypeSpec spec) {
 		String fqn = String.format("%s.%s", pkg, name);
 		JavaFile javaFile = JavaFile.builder(pkg, spec).build();
-		try(PrintWriter out = new PrintWriter(filer.createSourceFile(fqn).openWriter())) {
+		try(PrintWriter out = new PrintWriter(env.getFiler().createSourceFile(fqn).openWriter())) {
 			javaFile.writeTo(out);
 		} catch(IOException e) {
-			throw new RuntimeException(e);
+			env.getMessager().printMessage(
+				Diagnostic.Kind.ERROR,
+				String.format(
+					"[Lillero] An error occurred while writing class \"%s\": %s.\n%s",
+					fqn,
+					e.getMessage(),
+					ErrorReporter.stacktraceToString(e)
+				)
+			);
 		}
 
 		return fqn;

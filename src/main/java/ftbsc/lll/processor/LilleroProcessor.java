@@ -328,7 +328,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				.build();
 
 			this.injectors.add(writeClass(
-				this.processingEnv.getFiler(),
+				this.processingEnv,
 				injInfo.outputPackage,
 				injInfo.name,
 				injectorClass
@@ -369,7 +369,7 @@ public class LilleroProcessor extends AbstractProcessor {
 		}
 
 		writeClass(
-			this.processingEnv.getFiler(),
+			this.processingEnv,
 			pkg,
 			clazz,
 			spec.addAnnotation(mixinAnn.build()).build()
@@ -391,7 +391,14 @@ public class LilleroProcessor extends AbstractProcessor {
 			this.injectors.clear();
 			out.close();
 		} catch(IOException e) {
-			throw new RuntimeException(e);
+			this.processingEnv.getMessager().printMessage(
+				Diagnostic.Kind.ERROR,
+				String.format(
+					"[Lillero] An error occurred while generating the service provider file: %s.\n%s",
+					e.getMessage(),
+					ErrorReporter.stacktraceToString(e)
+				)
+			);
 		}
 	}
 }

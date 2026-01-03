@@ -7,6 +7,8 @@ import ftbsc.lll.processor.containers.ClassContainer;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayDeque;
 
 /**
@@ -200,5 +202,16 @@ public class ErrorReporter {
 		} else {
 			throw exception;
 		}
+	}
+
+	/**
+	 * Puts a {@link Throwable}'s stacktrace into a string.
+	 * @param t the throwable to get the stacktrace for
+	 * @return the stacktrace as string
+	 */
+	public static String stacktraceToString(Throwable t) {
+		StringWriter sw = new StringWriter();
+		t.printStackTrace(new PrintWriter(sw));
+		return sw.toString();
 	}
 }

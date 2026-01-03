@@ -17,7 +17,7 @@ public class Reportable extends RuntimeException {
 	 * @param params the params (for {@link String#format(String, Object...)})
 	 */
 	public Reportable(String format, Object... params) {
-		super(String.format("Lillero: " + format, params));
+		super(String.format("[Lillero] " + format, params));
 	}
 
 	/**
