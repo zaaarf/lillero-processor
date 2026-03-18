@@ -363,7 +363,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			}
 		}
 
-		TypeSpec.Builder spec = TypeSpec.classBuilder(clazz).addModifiers(Modifier.PUBLIC);
+		TypeSpec.Builder spec = TypeSpec.interfaceBuilder(clazz).addModifiers(Modifier.PUBLIC);
 		if(isPseudo) {
 			spec.addAnnotation(AnnotationSpec.builder(ClassName.get("org.spongepowered.asm.mixin", "Pseudo")).build());
 		}
