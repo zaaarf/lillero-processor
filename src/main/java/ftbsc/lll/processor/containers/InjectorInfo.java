@@ -7,6 +7,7 @@ import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.utils.JavaPoetUtils;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
@@ -120,7 +121,7 @@ public class InjectorInfo {
 		for(VariableElement param : this.injector.getParameters()) {
 			if(param.asType().equals(classNode)) sb.append("clazz,");
 			else if(param.asType().equals(methodNode)) sb.append("method,");
-			else if(finderMap.containsKey(param)) sb.append(param.getSimpleName().toString()).append(",");
+			else if(finderMap.containsKey(param)) sb.append(JavaPoetUtils.escapeString(param.getSimpleName().toString())).append(",");
 			else throw ErrorReporter.orphan(param);
 		}
 

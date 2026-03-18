@@ -99,4 +99,13 @@ public class JavaPoetUtils {
 
 		return fqn;
 	}
+
+	/**
+	 * Escapes a string that is meant to be used in JavaPoet so dollar signs are interpreted literally.
+	 * @param input the input to escape
+	 * @return the escaped string
+	 */
+	public static String escapeString(String input) {
+		return input.replace("$", "$$");
+	}
 }
