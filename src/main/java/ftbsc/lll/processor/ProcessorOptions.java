@@ -28,7 +28,8 @@ public class ProcessorOptions {
 		"obfuscateInjectorMetadata",
 		"noServiceProvider",
 		"fakeMixin", // lillero-mixin support
-		"outputPackage" // mostly for lillero-mixin, but other use cases may exist
+		"outputPackage", // mostly for lillero-mixin, but other use cases may exist
+		"apiPackage"
 	));
 
 	/**
@@ -78,6 +79,13 @@ public class ProcessorOptions {
 	public final String outputPackage;
 
 	/**
+	 * The package that lillero expects to find its API in.
+	 * Note that internal package consistency is expected to be guaranteed.
+	 * Will default to the known one.
+	 */
+	public final String apiPackage;
+
+	/**
 	 * The public constructor, parses and stores all given arguments.
 	 * @param env the environment the processor is working in
 	 */
@@ -96,6 +104,7 @@ public class ProcessorOptions {
 		this.noServiceProvider = parseBooleanArg(env.getOptions().get("noServiceProvider"), false);
 		this.fakeMixin = env.getOptions().get("fakeMixin");
 		this.outputPackage = env.getOptions().get("outputPackage");
+		this.apiPackage = env.getOptions().getOrDefault("apiPackage", "ftbsc.lll");
 	}
 
 	/**

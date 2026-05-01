@@ -66,7 +66,7 @@ public class FinderInfo {
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
 	public void appendToMethodSpec(MethodSpec.Builder methodBuilder, boolean local, ProcessorOptions options) {
-		ProxyType type = getProxyType(this.proxy);
+		ProxyType type = getProxyType(this.proxy, options);
 
 		if(type == ProxyType.PACKAGE) return; // packages don't need init
 

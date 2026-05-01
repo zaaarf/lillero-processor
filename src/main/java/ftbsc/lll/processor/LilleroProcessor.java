@@ -88,7 +88,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					}
 				}
 			} else if(annotation.getQualifiedName().contentEquals(BareInjector.class.getName())) {
-				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement("ftbsc.lll.IInjector").asType();
+				TypeMirror injectorType = this.processingEnv.getElementUtils().getTypeElement(this.options.apiPackage + ".IInjector").asType();
 				for(Element e : roundEnv.getElementsAnnotatedWith(annotation)) {
 					TypeElement type = (TypeElement) e;
 					if(this.processingEnv.getTypeUtils().isAssignable(e.asType(), injectorType)) {
@@ -276,7 +276,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		// take care of TypeProxies and FieldProxies
 		for(VariableElement proxyVar : finders) {
-			ProxyType type = getProxyType(proxyVar);
+			ProxyType type = getProxyType(proxyVar, this.options);
 			if(type == ProxyType.TYPE) {
 				matchedFinders.put(proxyVar, new FinderInfo(cl, proxyVar, null, null));
 			} else if(type == ProxyType.FIELD) {
@@ -384,7 +384,7 @@ public class LilleroProcessor extends AbstractProcessor {
 			FileObject serviceProvider = this.processingEnv.getFiler().createResource(
 				StandardLocation.CLASS_OUTPUT,
 				"",
-				"META-INF/services/ftbsc.lll.IInjector"
+				"META-INF/services/" + this.options.apiPackage + ".IInjector"
 			);
 			PrintWriter out = new PrintWriter(serviceProvider.openWriter());
 			this.injectors.forEach(out::println);

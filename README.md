@@ -233,6 +233,7 @@ want to disable them if you are sure that there is no better way to do what you'
 There are a few more processor arguments that this can take.
 - `noServiceProvider`: when set to `true`, skips generation of the service provider file.
 - `obfuscateInjectorMetadata`: when set to `false`, only proxies are obfuscated, `IInjector` data is not.
+- `apiPackage`: tells the processor to assume this environment's Lillero library was relocated to the given package (defaults to `ftbsc.lll`).
 
 ## Conclusions and Extras
 The processor's API should remain mostly stable, unless glaring issues are found, at least until version `1.0.0`.

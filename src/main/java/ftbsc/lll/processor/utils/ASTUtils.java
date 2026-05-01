@@ -597,24 +597,24 @@ public class ASTUtils {
 	 * Utility method for finding out what type of proxy a field is.
 	 * It will fail if the return type is not a known type of proxy.
 	 * @param v the annotated {@link VariableElement}
+	 * @param options the {@link ProcessorOptions}
 	 * @return the {@link ProxyType} for the element
 	 * @throws Reportable if it's not a known type
 	 * @since 0.4.0
 	 */
-	public static ProxyType getProxyType(VariableElement v) {
+	public static ProxyType getProxyType(VariableElement v, ProcessorOptions options) {
 		String returnTypeFQN = v.asType().toString();
-		switch(returnTypeFQN) {
-			case "ftbsc.lll.proxies.impl.FieldProxy":
-				return ProxyType.FIELD;
-			case "ftbsc.lll.proxies.impl.MethodProxy":
-				return ProxyType.METHOD;
-			case "ftbsc.lll.proxies.impl.TypeProxy":
-				return ProxyType.TYPE;
-			case "ftbsc.lll.proxies.impl.PackageProxy":
-				return ProxyType.PACKAGE;
-			default:
-				throw ErrorReporter.notAProxy(v);
+		if(returnTypeFQN.equals(options.apiPackage + ".proxies.impl.FieldProxy")) {
+			return ProxyType.FIELD;
+		} else if(returnTypeFQN.equals(options.apiPackage + ".proxies.impl.MethodProxy")) {
+			return ProxyType.METHOD;
+		} else if(returnTypeFQN.equals(options.apiPackage + ".proxies.impl.TypeProxy")) {
+			return ProxyType.TYPE;
+		} else if(returnTypeFQN.equals(options.apiPackage + ".proxies.impl.PackageProxy")) {
+			return ProxyType.PACKAGE;
 		}
+
+		throw ErrorReporter.notAProxy(v);
 	}
 
 	/**
