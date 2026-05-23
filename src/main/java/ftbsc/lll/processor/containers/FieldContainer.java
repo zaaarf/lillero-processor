@@ -1,13 +1,10 @@
 package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.processor.reporting.ErrorReporter;
-import ftbsc.lll.mapper.utils.MappingUtils;
-import ftbsc.lll.mapper.data.FieldData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.reporting.MemberType;
-import org.objectweb.asm.Type;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -24,9 +21,9 @@ import static ftbsc.lll.processor.utils.ASTUtils.*;
  */
 public class FieldContainer {
 	/**
-	 * The {@link FieldData} for the field represented by this container.
+	 * The name of the field.
 	 */
-	public final FieldData data;
+	public final String name;
 
 	/**
 	 * The descriptor of the field.
@@ -34,10 +31,16 @@ public class FieldContainer {
 	public final String descriptor;
 
 	/**
-	 * The obfuscated descriptor of the field.
-	 * If the mapper passed is null, then this will be identical to {@link #descriptor}.
+	 * The mapped name of the class.
+	 * Will be identical to {@link #name} if no mappings were given.
 	 */
-	public final String descriptorObf;
+	public final String nameMapped;
+
+	/**
+	 * The obfuscated descriptor of the field.
+	 * Will be identical to {@link #descriptor} if no mappings were given.
+	 */
+	public final String descriptorMapped;
 
 	/**
 	 * The {@link ClassContainer} representing the parent of this field.
@@ -68,8 +71,10 @@ public class FieldContainer {
 	) {
 		this.parent = parent;
 		if(parent.elem == null) { // unverified
-			if(descriptor == null)
+			if(descriptor == null) {
 				throw ErrorReporter.badNameBasedLookup(MemberType.FIELD);
+			}
+
 			this.elem = null;
 			this.descriptor = descriptor;
 		} else {
@@ -77,9 +82,10 @@ public class FieldContainer {
 			this.descriptor = descriptorFromType(this.elem.asType(), options.env);
 			name = this.elem.getSimpleName().toString();
 		}
-		this.data = getFieldData(parent.data.name, name, options.mapper);
-		this.descriptorObf = options.mapper == null ? this.descriptor
-			: MappingUtils.mapType(Type.getType(this.descriptor), options.mapper, false).getDescriptor();
+
+		this.name = name;
+		this.nameMapped = options.mapper.mapFieldName(parent.name, name, this.descriptor);
+		this.descriptorMapped = options.mapper.mapDescriptor(this.descriptor, false);
 	}
 
 	/**
@@ -118,7 +124,7 @@ public class FieldContainer {
 					f.typeFqn(),
 					f.typeInner(),
 					opts
-				).data.nameMapped);
+				).nameMapped);
 			} else descriptor = descriptorFromType(fieldType, opts.env);
 		}
 

@@ -317,12 +317,12 @@ public class LilleroProcessor extends AbstractProcessor {
 				.addMethod(buildStringReturnMethod("name", injInfo.name))
 				.addMethod(buildStringReturnMethod("reason", injInfo.reason))
 				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata
-					? targetClass.data.nameMapped.replace('/', '.')
-					: targetClass.data.name.replace('/', '.')))
+					? targetClass.nameMapped.replace('/', '.')
+					: targetClass.name.replace('/', '.')))
 				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata
-					? target.data.nameMapped : target.data.signature.name))
+					? target.nameMapped : target.name))
 				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata
-					? target.descriptorObf : target.data.signature.name))
+					? target.descriptorMapped : target.descriptor))
 				.addMethods(generateDummies(cl))
 				.addMethod(injInfo.generateInjector(this.options))
 				.build();

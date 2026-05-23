@@ -32,7 +32,7 @@ public class ErrorReporter {
 	 * @return the exception to throw
 	 */
 	public static Reportable untraceableInheritance(ClassContainer parent) {
-		return new Reportable("Can't check inherited fields on manually typed class %s!", parent.data.name);
+		return new Reportable("Can't check inherited fields on manually typed class %s!", parent.name);
 	}
 
 	/**
@@ -45,9 +45,9 @@ public class ErrorReporter {
 	public static Reportable untraceableInheritance(ClassContainer parent, Element member, ClassContainer from) {
 		return new Reportable(
 			"Found inherited member %s::%s, but it's unreachable from context %s!",
-			parent.data.name,
+			parent.name,
 			member.getEnclosingElement().getSimpleName().toString(),
-			from.data.name
+			from.name
 		);
 	}
 

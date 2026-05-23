@@ -1,10 +1,6 @@
 package ftbsc.lll.processor.utils;
 
 import ftbsc.lll.exceptions.*;
-import ftbsc.lll.mapper.utils.Mapper;
-import ftbsc.lll.mapper.data.ClassData;
-import ftbsc.lll.mapper.data.FieldData;
-import ftbsc.lll.mapper.data.MethodData;
 import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.annotations.Find;
@@ -217,77 +213,6 @@ public class ASTUtils {
 	}
 
 	/**
-	 * Gets the {@link ClassData} corresponding to the given internal name,
-	 * or creates a false one with the same, non-obfuscated name twice.
-	 * @param name the internal name of the class to convert
-	 * @param mapper the {@link Mapper} to use, may be null
-	 * @return the fully qualified class name
-	 * @since 0.6.1
-	 */
-	public static ClassData getClassData(String name, Mapper mapper) {
-		try {
-			name = name.replace('.', '/'); // just in case
-			if(mapper != null) {
-				return mapper.getClassData(name);
-			}
-		} catch(MappingNotFoundException ignored) {}
-		return new ClassData(name, name);
-	}
-
-	/**
-	 * Gets the {@link MethodData} corresponding to the method matching the given
-	 * name, parent and descriptor, or creates a dummy one with fake data if no
-	 * valid mapping is found.
-	 * @param parent the internal name of the parent class
-	 * @param name the name of the member
-	 * @param descriptor the descriptor of the method
-	 * @param mapper the {@link Mapper} to use, may be null
-	 * @param outcome an array whose first element will be set to false if an exception is thrown, may be null
-	 * @return the method data
-	 * @since 0.6.1
-	 */
-	public static MethodData getMethodData(
-		String parent,
-		String name,
-		String descriptor,
-		Mapper mapper,
-		boolean[] outcome // janky but it's the lesser evil
-	) {
-		try {
-			parent = parent.replace('.', '/'); // just in case
-			if(mapper != null) {
-				return mapper.getMethodData(parent, name, descriptor);
-			}
-		} catch(MappingNotFoundException ex) {
-			if(outcome != null && outcome.length >= 1) {
-				outcome[0] = false;
-			}
-		}
-
-		return new MethodData(getClassData(name, mapper), name, name, descriptor);
-	}
-
-	/**
-	 * Gets the {@link FieldData} corresponding to the field matching the given
-	 * name and parent, or creates a dummy one with fake data if no valid
-	 * mapping is found.
-	 * @param parent the internal name of the parent class
-	 * @param name the name of the member
-	 * @param mapper the {@link Mapper} to use, may be null
-	 * @return the field data
-	 * @since 0.6.1
-	 */
-	public static FieldData getFieldData(String parent, String name, Mapper mapper) {
-		try {
-			name = name.replace('.', '/'); // just in case
-			if(mapper != null) {
-				return mapper.getFieldData(parent, name);
-			}
-		} catch(MappingNotFoundException ignored) {}
-		return new FieldData(getClassData(name, mapper), name, name);
-	}
-
-	/**
 	 * Checks that a given {@link Element} is accessible from a certain {@link TypeElement} context.
 	 * @param member the {@link Element} to check
 	 * @param from the {@link TypeElement} to try and access from
@@ -391,7 +316,7 @@ public class ASTUtils {
 			if(inherited) {
 				throw ErrorReporter.untraceableInheritance(parent);
 			} else {
-				throw ErrorReporter.notFound("parent", MemberType.CLASS, parent.data.name);
+				throw ErrorReporter.notFound("parent", MemberType.CLASS, parent.name);
 			}
 		}
 
@@ -405,7 +330,7 @@ public class ASTUtils {
 						field ? MemberType.FIELD : MemberType.METHOD,
 						name,
 						descr,
-						parent.data.name
+						parent.name
 					);
 				}
 
@@ -446,7 +371,7 @@ public class ASTUtils {
 				throw ErrorReporter.notFound(
 					field ? MemberType.FIELD : MemberType.METHOD,
 					name,
-					parent.data.name
+					parent.name
 				);
 			} else {
 				return null;
@@ -462,7 +387,7 @@ public class ASTUtils {
 				field ? MemberType.FIELD : MemberType.METHOD,
 				candidates.size(),
 				name,
-				parent.data.name
+				parent.name
 			);
 		} else {
 			if(field) {
@@ -474,7 +399,7 @@ public class ASTUtils {
 						MemberType.FIELD,
 						name,
 						descr,
-						parent.data.name
+						parent.name
 					);
 				}
 			} else {
@@ -494,7 +419,7 @@ public class ASTUtils {
 					MemberType.METHOD,
 					name,
 					descr,
-					parent.data.name
+					parent.name
 				);
 			}
 
@@ -503,7 +428,7 @@ public class ASTUtils {
 					MemberType.METHOD,
 					candidates.size(),
 					name,
-					parent.data.name
+					parent.name
 				);
 			}
 			return candidates.get(0);
@@ -668,8 +593,8 @@ public class ASTUtils {
 			processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
 				String.format(
 					"Found orphan @Target annotation on method %s.%s pointing at method %s, it will be ignored!",
-					parent.getSimpleName().toString(),
-					target.getSimpleName().toString(),
+					parent.getSimpleName(),
+					target.getSimpleName(),
 					targetAnn.of()
 				)
 			);

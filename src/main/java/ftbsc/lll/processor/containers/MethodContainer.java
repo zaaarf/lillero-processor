@@ -1,9 +1,6 @@
 package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.processor.reporting.ErrorReporter;
-import ftbsc.lll.mapper.data.ClassData;
-import ftbsc.lll.mapper.utils.MappingUtils;
-import ftbsc.lll.mapper.data.MethodData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Patch;
@@ -27,16 +24,26 @@ import static ftbsc.lll.processor.utils.ASTUtils.*;
  */
 public class MethodContainer {
 	/**
-	 * The {@link MethodData} for the method represented by this container.
+	 * The name of the method.
 	 */
-	public final MethodData data;
+	public final String name;
 
 	/**
-	 * The obfuscated descriptor of the field.
-	 * If the mapper passed is null, this will be identical to the one inside
-	 * {@link #data}.
+	 * The descriptor of the method.
 	 */
-	public final String descriptorObf;
+	public final String descriptor;
+
+	/**
+	 * The mapped name of the method.
+	 * Will be identical to {@link #name} if no mappings were given.
+	 */
+	public final String nameMapped;
+
+	/**
+	 * The mapped descriptor of the method.
+	 * Will be identical to {@link #descriptor} if no mappings were given.
+	 */
+	public final String descriptorMapped;
 
 	/**
 	 * The {@link ClassContainer} representing the parent of this method.
@@ -95,15 +102,15 @@ public class MethodContainer {
 			}
 		}
 
-		boolean[] lookupOutcome = { true };
-		MethodData baseData = getMethodData(parent.data.name, name, descriptor, options.mapper, lookupOutcome);
+		this.name = name;
+		this.descriptor = descriptor;
 
 		// some mapping formats omit methods if they are overriding a parent's method
-		// when baseData's obfuscation lookup fails, try to look up the top parent, since there is no
-		// drawback but efficiency
+		// if the mapper does not have this method, try to look up the top parent
+		// since there is no real drawback in being slightly wasteful here
 		if(
 			this.parent.elem != null
-				&& (overriddenStub != null || !lookupOutcome[0])
+				&& (overriddenStub != null || !options.mapper.hasMethod(parent.name, name, descriptor))
 				&& (this.elem == null ^ overriddenStub == null)
 		) {
 			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
@@ -125,35 +132,23 @@ public class MethodContainer {
 					false,
 					options
 				);
-			} else top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
-			ClassData topParentData = getClassData(
+			} else {
+				top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
+			}
+
+			this.nameMapped = options.mapper.mapMethod(
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
-				options.mapper
-			);
-
-			MethodData topData = getMethodData(
-				topParentData.name,
 				top.getSimpleName().toString(),
-				descriptorFromExecutableElement(top, options.env),
-				options.mapper,
-				null
+				descriptorFromExecutableElement(top, options.env)
 			);
-
-			this.data = new MethodData(
-				parent.data,
-				baseData.signature.name,
-				topData.nameMapped,
-				baseData.signature.descriptor
-			);
-		} else this.data = baseData;
-
-		if(strict) {
-			descriptor = this.data.signature.descriptor;
+		} else {
+			this.nameMapped = options.mapper.mapMethod(parent.name, name, descriptor);
 		}
 
-		this.descriptorObf = options.mapper == null
-			? descriptor
-			: MappingUtils.mapMethodDescriptor(descriptor, options.mapper, false);
+		this.descriptorMapped = options.mapper.mapDescriptor(
+			this.descriptor,
+			false
+		);
 	}
 
 	/**

@@ -87,7 +87,7 @@ public class FinderInfo {
 					TypeProxy.class,
 					this.proxy.getSimpleName().toString(),
 					TypeProxy.class,
-					clazz.data.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
+					clazz.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
 			} else {
@@ -95,7 +95,7 @@ public class FinderInfo {
 					"super.$L = $T.from($S, 0, $L)",
 					this.proxy.getSimpleName().toString(),
 					TypeProxy.class,
-					clazz.data.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
+					clazz.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
 			}
@@ -112,14 +112,14 @@ public class FinderInfo {
 
 		if(isMethod) {
 			MethodContainer mc = MethodContainer.from(this.targetStub, this.targetAnn, f, options);
-			descriptorObf = mc.descriptorObf;
-			nameObf = mc.data.nameMapped;
+			descriptorObf = mc.descriptorMapped;
+			nameObf = mc.nameMapped;
 			parent = mc.parent;
 			target = mc.elem;
 		} else {
 			FieldContainer fc = FieldContainer.from(this.proxy, options);
-			descriptorObf = fc.descriptorObf;
-			nameObf = fc.data.nameMapped;
+			descriptorObf = fc.descriptorMapped;
+			nameObf = fc.nameMapped;
 			parent = fc.parent;
 			target = fc.elem;
 		}
@@ -136,7 +136,7 @@ public class FinderInfo {
 		methodBuilder.addStatement(
 			"$L.setParent($S, $L)",
 			builderName,
-			parent.data.nameMapped.replace('/', '.'),
+			parent.nameMapped.replace('/', '.'),
 			parent.elem == null ? 0 : mapModifiers(parent.elem.getModifiers())
 		);
 

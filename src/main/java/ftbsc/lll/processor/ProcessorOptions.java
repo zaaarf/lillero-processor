@@ -1,14 +1,20 @@
 package ftbsc.lll.processor;
 
 import ftbsc.lll.IInjector;
-import ftbsc.lll.mapper.MapperProvider;
-import ftbsc.lll.mapper.utils.Mapper;
+import ftbsc.lll.processor.utils.Mapper;
+import net.fabricmc.mappingio.MappingReader;
+import net.fabricmc.mappingio.tree.MappingTreeView;
+import net.fabricmc.mappingio.tree.MemoryMappingTree;
+import net.fabricmc.mappingio.tree.VisitableMappingTree;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import javax.tools.Diagnostic;
+import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Class in charge of containing, parsing and processing all processor options,
@@ -38,8 +44,8 @@ public class ProcessorOptions {
 	public final ProcessingEnvironment env;
 
 	/**
-	 * The {@link Mapper} used to convert classes and variables
-	 * to their obfuscated equivalent. Will be null when no mapper is in use.
+	 * The {@link Mapper} used to convert classes and variables to their obfuscated equivalent.
+	 * Will perform no-ops when no mappings were provided.
 	 */
 	public final Mapper mapper;
 
@@ -91,13 +97,6 @@ public class ProcessorOptions {
 	 */
 	public ProcessorOptions(ProcessingEnvironment env) {
 		this.env = env;
-		String location = env.getOptions().get("mappingsFile");
-		String namespaceFrom = env.getOptions().get("mappingsNamespaceFrom");
-		String namespaceTo = env.getOptions().get("mappingsNamespaceTo");
-		if(location != null) {
-			List<String> lines = MapperProvider.fetchFromLocalOrRemote(location);
-			this.mapper = MapperProvider.getMapper(lines).getMapper(lines, namespaceFrom, namespaceTo, true);
-		} else this.mapper = null;
 		this.anonymousClassWarning = parseBooleanArg(env.getOptions().get("anonymousClassWarning"), true);
 		this.manualClassWarning = parseBooleanArg(env.getOptions().get("manualClassWarning"), true);
 		this.obfuscateInjectorMetadata = parseBooleanArg(env.getOptions().get("obfuscateInjectorMetadata"), true);
@@ -105,6 +104,56 @@ public class ProcessorOptions {
 		this.fakeMixin = env.getOptions().get("fakeMixin");
 		this.outputPackage = env.getOptions().get("outputPackage");
 		this.apiPackage = env.getOptions().getOrDefault("apiPackage", "ftbsc.lll");
+
+		String location = env.getOptions().get("mappingsFile");
+		String namespaceFrom = env.getOptions().get("mappingsNamespaceFrom");
+		String namespaceTo = env.getOptions().get("mappingsNamespaceTo");
+
+		VisitableMappingTree tree = new MemoryMappingTree();
+		if(location != null) {
+			try {
+				readMappingsFromLocalOrRemote(tree, location);
+
+				if(namespaceFrom != null && tree.getNamespaceId(namespaceFrom) == MappingTreeView.NULL_NAMESPACE_ID) {
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "\"namespaceFrom\" not found in the given mappings!");
+				}
+
+				if(namespaceTo != null && tree.getNamespaceId(namespaceTo) == MappingTreeView.NULL_NAMESPACE_ID) {
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "\"namespaceTo\" not found in the given mappings!");
+				}
+
+				if(namespaceTo == null && namespaceFrom == null && tree.getDstNamespaces().size() != 1) {
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "The given mapping format requires specifying namespaces.");
+				}
+			} catch(IOException ex) {
+				env.getMessager().printMessage(Diagnostic.Kind.ERROR, "Failed to read mappings: " + ex.getMessage());
+			}
+		}
+
+		this.mapper = new Mapper(tree, namespaceFrom, namespaceTo);
+	}
+
+	private static void readMappingsFromLocalOrRemote(VisitableMappingTree tree, String location) throws IOException {
+		InputStream targetStream;
+		try {
+			URI target = new URI(location);
+			targetStream = target.toURL().openStream();
+		} catch(URISyntaxException | IllegalArgumentException ex) {
+			// may be a local file path
+			File f = new File(location);
+			targetStream = new FileInputStream(f);
+		}
+
+		// this is ugly but fabric loves their readers
+		String body = new BufferedReader(new InputStreamReader(targetStream, StandardCharsets.UTF_8))
+			.lines()
+			.collect(Collectors.joining("\n"));
+
+		MappingReader.read(
+			new StringReader(body),
+			MappingReader.detectFormat(new StringReader(body)),
+			tree
+		);
 	}
 
 	/**

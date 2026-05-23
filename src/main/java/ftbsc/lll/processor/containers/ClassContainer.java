@@ -1,7 +1,6 @@
 package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.processor.reporting.ErrorReporter;
-import ftbsc.lll.mapper.data.ClassData;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.ProcessorOptions;
@@ -21,9 +20,15 @@ import static ftbsc.lll.processor.utils.ASTUtils.*;
  */
 public class ClassContainer {
 	/**
-	 * The {@link ClassData} for the class represented by this container.
+	 * The name of the class.
 	 */
-	public final ClassData data;
+	public final String name;
+
+	/**
+	 * The mapped name of the class.
+	 * Will be identical to {@link #name} if no mappings were given.
+	 */
+	public final String nameMapped;
 
 	/**
 	 * The {@link TypeElement} corresponding to the class.
@@ -97,7 +102,8 @@ public class ClassContainer {
 			}
 		}
 
-		this.data = getClassData(fqnBuilder.toString(), options.mapper);
+		this.name = fqnBuilder.toString();
+		this.nameMapped = options.mapper.mapClass(this.name);
 		this.elem = elem;
 	}
 
@@ -144,7 +150,7 @@ public class ClassContainer {
 		}
 
 		ClassContainer cl = ClassContainer.from(f, Find::value, f.fqn(), f.inner(), options);
-		return cl.data.name.equals("java/lang/Object")
+		return cl.name.equals("java/lang/Object")
 			? describe(fallback, options)
 			: cl;
 	}

@@ -29,5 +29,5 @@ dependencies {
 	implementation 'com.squareup:javapoet:1.13.0'
 	implementation 'org.ow2.asm:asm-commons:9.7'
 	implementation 'ftbsc:lll:0.6.1'
-	implementation 'ftbsc.lll:mapper:0.5.2'
+	implementation 'net.fabricmc:mapping-io:0.8.0'
 }
