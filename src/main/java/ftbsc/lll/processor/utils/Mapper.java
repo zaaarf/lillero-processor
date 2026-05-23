@@ -8,9 +8,28 @@ import net.fabricmc.mappingio.tree.MappingTreeView;
  * that is friendlier to our use-case.
  */
 public class Mapper {
+	/**
+	 * The {@link MappingTreeView} representing the mappings.
+	 */
 	private final MappingTreeView tree;
-	private final int from, to;
 
+	/**
+	 * The index within {@link #tree} of the namespace to map from.
+	 */
+	private final int from;
+
+	/**
+	 * The index within {@link #tree} of the namespace to map to.
+	 */
+	private final int to;
+
+	/**
+	 * Creates a new mapper from the given parsed tree.
+	 * The given namespaces must either be null or be guaranteed to be valid.
+	 * @param tree the tree that contains the info
+	 * @param from the namespace to map from
+	 * @param to the namespace to map to
+	 */
 	public Mapper(MappingTree tree, String from, String to) {
 		this.tree = tree;
 		this.from = from != null
@@ -21,6 +40,11 @@ public class Mapper {
 			: this.tree.getMaxNamespaceId();
 	}
 
+	/**
+	 * Maps a class name according to this mapper.
+	 * @param name the name of the class
+	 * @return the mapped name
+	 */
 	public String mapClassName(String name) {
 		MappingTree.ClassMappingView cls = this.tree.getClass(name, this.from);
 		if(cls == null) {
@@ -31,13 +55,20 @@ public class Mapper {
 		return mapped != null ? mapped : name;
 	}
 
-	public String mapMethodName(String owner, String name, String desc) {
-		MappingTree.ClassMappingView cls = tree.getClass(owner, this.from);
+	/**
+	 * Maps a method name according to this mapper.
+	 * @param parent the parent class
+	 * @param name the name of the method
+	 * @param descriptor the descriptor of the method
+	 * @return the mapped name
+	 */
+	public String mapMethodName(String parent, String name, String descriptor) {
+		MappingTree.ClassMappingView cls = tree.getClass(parent, this.from);
 		if(cls == null) {
 			return name;
 		}
 
-		MappingTree.MethodMappingView m = cls.getMethod(name, desc, this.from);
+		MappingTree.MethodMappingView m = cls.getMethod(name, descriptor, this.from);
 		if(m == null) {
 			return name;
 		}
@@ -46,8 +77,15 @@ public class Mapper {
 		return mapped != null ? mapped : name;
 	}
 
-	public String mapFieldName(String owner, String name, String descriptor) {
-		MappingTree.ClassMappingView cls = this.tree.getClass(owner, this.from);
+	/**
+	 * Maps a field name according to this mapper.
+	 * @param parent the parent class
+	 * @param name the name of the field
+	 * @param descriptor the descriptor of the field
+	 * @return the mapped name
+	 */
+	public String mapFieldName(String parent, String name, String descriptor) {
+		MappingTree.ClassMappingView cls = this.tree.getClass(parent, this.from);
 		if(cls == null) {
 			return name;
 		}
@@ -62,32 +100,31 @@ public class Mapper {
 	}
 
 	/**
-	 * Maps a descriptor according to the given mapper.
-	 * @param desc the descriptor to map
-	 * @param reverse whether to map 'to' to 'from' instead
+	 * Maps a descriptor according to this mapper.
+	 * @param descriptor the descriptor to map
 	 * @return the mapped descriptor
 	 */
-	public String mapDescriptor(String desc, boolean reverse) {
+	public String mapDescriptor(String descriptor) {
 		StringBuilder result = new StringBuilder();
 		int i = 0;
-		while(i < desc.length()) {
-			if(desc.charAt(i) == 'L') {
-				int closing = desc.indexOf(';', i + 1);
+		while(i < descriptor.length()) {
+			if(descriptor.charAt(i) == 'L') {
+				int closing = descriptor.indexOf(';', i + 1);
 				if(closing == -1) {
-					result.append(desc.substring(i));
+					result.append(descriptor.substring(i));
 					break;
 				}
 
-				String className = desc.substring(i + 1, closing);
-				MappingTree.ClassMappingView mapping = this.tree.getClass(className, reverse ? this.to : this.from);
+				String className = descriptor.substring(i + 1, closing);
+				MappingTree.ClassMappingView mapping = this.tree.getClass(className, this.from);
 				if(mapping != null) {
-					className = mapping.getName(reverse ? this.from : this.to);
+					className = mapping.getName(this.to);
 				}
 
 				result.append('L').append(className).append(';');
 				i = closing + 1;
 			} else {
-				result.append(desc.charAt(i));
+				result.append(descriptor.charAt(i));
 				i++;
 			}
 		}
@@ -97,13 +134,13 @@ public class Mapper {
 
 	/**
 	 * Checks if there is a mapping for the given method.
-	 * @param owner the owner
+	 * @param parent the parent
 	 * @param name the method name
 	 * @param descriptor the method descriptor
 	 * @return true if a mapping existed
 	 */
-	public boolean hasMethod(String owner, String name, String descriptor) {
-		MappingTree.ClassMappingView cls = this.tree.getClass(owner, this.from);
+	public boolean hasMethod(String parent, String name, String descriptor) {
+		MappingTree.ClassMappingView cls = this.tree.getClass(parent, this.from);
 		if(cls == null) {
 			return false;
 		}

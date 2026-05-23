@@ -85,7 +85,7 @@ public class FieldContainer {
 
 		this.name = name;
 		this.nameMapped = options.mapper.mapFieldName(parent.name, name, this.descriptor);
-		this.descriptorMapped = options.mapper.mapDescriptor(this.descriptor, false);
+		this.descriptorMapped = options.mapper.mapDescriptor(this.descriptor);
 	}
 
 	/**

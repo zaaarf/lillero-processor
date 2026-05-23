@@ -145,10 +145,7 @@ public class MethodContainer {
 			this.nameMapped = options.mapper.mapMethodName(parent.name, name, descriptor);
 		}
 
-		this.descriptorMapped = options.mapper.mapDescriptor(
-			this.descriptor,
-			false
-		);
+		this.descriptorMapped = options.mapper.mapDescriptor(this.descriptor);
 	}
 
 	/**
