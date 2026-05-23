@@ -96,7 +96,7 @@ public class LilleroProcessor extends AbstractProcessor {
 					} else {
 						this.processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, String.format(
 							"Class %s annotated with @BareInjector is not an instance of IInjector, skipping...",
-							type.getQualifiedName().toString()
+							type.getQualifiedName()
 						));
 					}
 				}

@@ -128,7 +128,7 @@ public class ASTUtils {
 		StringBuilder fqnBuilder = new StringBuilder();
 		while(elem.getEnclosingElement() != null && elem.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
 			fqnBuilder
-				.insert(0, elem.getSimpleName().toString())
+				.insert(0, elem.getSimpleName())
 				.insert(0, "$");
 			elem = elem.getEnclosingElement();
 		}

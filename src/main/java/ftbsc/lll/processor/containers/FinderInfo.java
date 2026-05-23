@@ -104,7 +104,7 @@ public class FinderInfo {
 		}
 
 		final boolean isMethod = type == ProxyType.METHOD;
-		final String builderName = this.proxy.getSimpleName().toString() + "Builder";
+		final String builderName = this.proxy.getSimpleName() + "Builder";
 
 		String descriptorObf, nameObf;
 		ClassContainer parent;
