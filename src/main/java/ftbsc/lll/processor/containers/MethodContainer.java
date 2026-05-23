@@ -136,13 +136,13 @@ public class MethodContainer {
 				top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
 			}
 
-			this.nameMapped = options.mapper.mapMethod(
+			this.nameMapped = options.mapper.mapMethodName(
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
 				top.getSimpleName().toString(),
 				descriptorFromExecutableElement(top, options.env)
 			);
 		} else {
-			this.nameMapped = options.mapper.mapMethod(parent.name, name, descriptor);
+			this.nameMapped = options.mapper.mapMethodName(parent.name, name, descriptor);
 		}
 
 		this.descriptorMapped = options.mapper.mapDescriptor(

@@ -103,7 +103,7 @@ public class ClassContainer {
 		}
 
 		this.name = fqnBuilder.toString().replace('.', '/');
-		this.nameMapped = options.mapper.mapClass(this.name);
+		this.nameMapped = options.mapper.mapClassName(this.name);
 		this.elem = elem;
 	}
 

@@ -21,7 +21,7 @@ public class Mapper {
 			: this.tree.getMaxNamespaceId();
 	}
 
-	public String mapClass(String name) {
+	public String mapClassName(String name) {
 		MappingTree.ClassMappingView cls = this.tree.getClass(name, this.from);
 		if(cls == null) {
 			return name;
@@ -31,7 +31,7 @@ public class Mapper {
 		return mapped != null ? mapped : name;
 	}
 
-	public String mapMethod(String owner, String name, String desc) {
+	public String mapMethodName(String owner, String name, String desc) {
 		MappingTree.ClassMappingView cls = tree.getClass(owner, this.from);
 		if(cls == null) {
 			return name;
@@ -84,7 +84,7 @@ public class Mapper {
 					className = mapping.getName(reverse ? this.from : this.to);
 				}
 
-				result.append(className);
+				result.append('L').append(className).append(';');
 				i = closing + 1;
 			} else {
 				result.append(desc.charAt(i));
