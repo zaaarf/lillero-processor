@@ -131,18 +131,18 @@ public class ProcessorOptions {
 				readMappingsFromLocalOrRemote(tree, location);
 
 				if(namespaceFrom != null && tree.getNamespaceId(namespaceFrom) == MappingTreeView.NULL_NAMESPACE_ID) {
-					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "\"namespaceFrom\" not found in the given mappings!");
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "[Lillero] \"namespaceFrom\" not found in the given mappings!");
 				}
 
 				if(namespaceTo != null && tree.getNamespaceId(namespaceTo) == MappingTreeView.NULL_NAMESPACE_ID) {
-					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "\"namespaceTo\" not found in the given mappings!");
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "[Lillero] \"namespaceTo\" not found in the given mappings!");
 				}
 
 				if(namespaceTo == null && namespaceFrom == null && tree.getDstNamespaces().size() != 1) {
-					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "The given mapping format requires specifying namespaces.");
+					env.getMessager().printMessage(Diagnostic.Kind.ERROR, "[Lillero] The given mapping format requires specifying namespaces.");
 				}
 			} catch(IOException ex) {
-				env.getMessager().printMessage(Diagnostic.Kind.ERROR, "Failed to read mappings: " + ex.getMessage());
+				env.getMessager().printMessage(Diagnostic.Kind.ERROR, "[Lillero] Failed to read mappings: " + ex.getMessage());
 			}
 		}
 
