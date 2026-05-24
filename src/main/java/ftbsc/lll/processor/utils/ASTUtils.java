@@ -326,7 +326,7 @@ public class ASTUtils {
 			if(found == null) {
 				if(!parentCursor.elem.getSuperclass().getKind().equals(TypeKind.DECLARED)) {
 					throw ErrorReporter.notFound(
-						"inherited",
+						"(possibly inherited)",
 						field ? MemberType.FIELD : MemberType.METHOD,
 						name,
 						descr,
