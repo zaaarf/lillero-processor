@@ -176,10 +176,17 @@ You may pass a mappings file to the processor by adding this to your `build.grad
 ```groovy
 compileJava { // mappings for lillero-processor
 	options.compilerArgs << '-AmappingsFile=remote_url_or_local_path'
+	// these two are only necessary when the mapping type used (i.e. tinyv2) supports multiple namespaces
+	options.compilerArgs << '-AnamespaceFrom=named'
+	options.compilerArgs << '-AnamespaceTo=intermediary'
 }
 ```
-This feature is powered by [Lillero-mapper](https://github.com/zaaarf/lillero-mapper). It supports multiple formats;
-my personal recommendation is `tinyv2`, but see the project's README for more information.
+Up until version `0.9.7`, this feature was powered by [Lillero-mapper](https://github.com/zaaarf/lillero-mapper).
+Since `0.9.8` it instead uses [mapping-io](https://github.com/FabricMC/mapping-io), as the mapper project was archived
+due to concerns about maintainability.
+
+Multiple formats are supported; the better one is probably `tinyv2`, but see the relevant project's README for more
+information.
 
 #### Limitations
 Many mapping formats like to "trim" their contents by not repeating information about overriding methods. In general,
