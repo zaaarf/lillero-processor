@@ -37,7 +37,7 @@ public class Mapper {
 			: MappingTree.SRC_NAMESPACE_ID;
 		this.to = to != null
 			? this.tree.getNamespaceId(to)
-			: this.tree.getMaxNamespaceId();
+			: this.tree.getMaxNamespaceId() - 1;
 	}
 
 	/**
