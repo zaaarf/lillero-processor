@@ -121,8 +121,8 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * @return whether it can be converted into a valid {@link IInjector}.
 	 */
 	public boolean isValidInjector(TypeElement elem) {
-		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
-		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
+		TypeMirror classNodeType = this.processingEnv.getElementUtils().getTypeElement(this.options.asmPackage + ".ClassNode").asType();
+		TypeMirror methodNodeType = this.processingEnv.getElementUtils().getTypeElement(this.options.asmPackage + ".MethodNode").asType();
 		if(
 			elem.getEnclosedElements()
 				.stream()
@@ -349,7 +349,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		// generate real mixin
 		AnnotationSpec.Builder mixinAnn = AnnotationSpec.builder(ClassName.get(
-			"org.spongepowered.asm.mixin",
+			this.options.mixinPackage,
 			"Mixin"
 		));
 
@@ -365,7 +365,7 @@ public class LilleroProcessor extends AbstractProcessor {
 
 		TypeSpec.Builder spec = TypeSpec.interfaceBuilder(clazz).addModifiers(Modifier.PUBLIC);
 		if(isPseudo) {
-			spec.addAnnotation(AnnotationSpec.builder(ClassName.get("org.spongepowered.asm.mixin", "Pseudo")).build());
+			spec.addAnnotation(AnnotationSpec.builder(ClassName.get(this.options.mixinPackage, "Pseudo")).build());
 		}
 
 		writeClass(

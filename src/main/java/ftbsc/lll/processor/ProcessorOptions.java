@@ -35,7 +35,9 @@ public class ProcessorOptions {
 		"noServiceProvider",
 		"fakeMixin", // lillero-mixin support
 		"outputPackage", // mostly for lillero-mixin, but other use cases may exist
-		"apiPackage"
+		"apiPackage",
+		"mixinPackage",
+		"asmPackage"
 	));
 
 	/**
@@ -92,6 +94,18 @@ public class ProcessorOptions {
 	public final String apiPackage;
 
 	/**
+	 * The package containing the @Mixin and @Pseudo annotations.
+	 * Will default to the known one.
+	 */
+	public final String mixinPackage;
+
+	/**
+	 * The package containing ASM's ClassNode and MethodNode.
+	 * Will default to the known one.
+	 */
+	public final String asmPackage;
+
+	/**
 	 * The public constructor, parses and stores all given arguments.
 	 * @param env the environment the processor is working in
 	 */
@@ -104,6 +118,8 @@ public class ProcessorOptions {
 		this.fakeMixin = env.getOptions().get("fakeMixin");
 		this.outputPackage = env.getOptions().get("outputPackage");
 		this.apiPackage = env.getOptions().getOrDefault("apiPackage", "ftbsc.lll");
+		this.mixinPackage = env.getOptions().getOrDefault("mixinPackage", "org.spongepowered.asm.mixin");
+		this.asmPackage = env.getOptions().getOrDefault("asmPackage", "org.objectweb.asm.tree");
 
 		String location = env.getOptions().get("mappingsFile");
 		String namespaceFrom = env.getOptions().get("mappingsNamespaceFrom");

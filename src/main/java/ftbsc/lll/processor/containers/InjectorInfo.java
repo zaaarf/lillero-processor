@@ -98,11 +98,11 @@ public class InjectorInfo {
 	public MethodSpec generateInjector(ProcessorOptions options) {
 		TypeMirror classNode = options.env
 			.getElementUtils()
-			.getTypeElement("org.objectweb.asm.tree.ClassNode").asType();
+			.getTypeElement(options.asmPackage + ".ClassNode").asType();
 
 		TypeMirror methodNode = options.env
 			.getElementUtils()
-			.getTypeElement("org.objectweb.asm.tree.MethodNode").asType();
+			.getTypeElement(options.asmPackage + ".MethodNode").asType();
 
 		MethodSpec.Builder injectBuilder = MethodSpec.methodBuilder("inject")
 			.addModifiers(Modifier.PUBLIC)
