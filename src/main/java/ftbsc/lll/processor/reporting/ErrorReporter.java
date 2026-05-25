@@ -4,6 +4,7 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.containers.ClassContainer;
+import ftbsc.lll.processor.utils.ASTUtils;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
@@ -152,6 +153,20 @@ public class ErrorReporter {
 	}
 
 	/**
+	 * Reports an error due to a member that needs to be overridden not being visible.
+	 * @param element the element that is not visible
+	 * @return the exception to throw
+	 */
+	public static Reportable notVisible(Element element) {
+		Modifier visibility = ASTUtils.getVisibilityModifier(element);
+		return new Reportable(
+			"Element %s has visibility %s, which is not accessible from the given output package!!",
+			buildPath(element),
+			visibility != null ? element.toString().toLowerCase() : "package-private"
+		);
+	}
+
+	/**
 	 * Reports an error due to the requested member not being found.
 	 * @param adjective an adjective to add to the type (nullable)
 	 * @param type the type of element being sought (class, method, etc.)
@@ -181,7 +196,7 @@ public class ErrorReporter {
 			cur = cur.getEnclosingElement();
 		}
 
-		return ((QualifiedNameable) cur).getQualifiedName().toString()
+		return ((QualifiedNameable) cur).getQualifiedName()
 			+ "::"
 			+ String.join("::", name);
 	}

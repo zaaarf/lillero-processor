@@ -6,6 +6,7 @@ import net.fabricmc.mappingio.tree.MappingTreeView;
 /**
  * Wrapper around a mappings-io {@link MappingTree} that provides an API
  * that is friendlier to our use-case.
+ * @since 0.9.8
  */
 public class Mapper {
 	/**

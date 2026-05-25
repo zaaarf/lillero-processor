@@ -1,6 +1,5 @@
 package ftbsc.lll.processor.utils;
 
-import ftbsc.lll.exceptions.*;
 import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.annotations.Find;
@@ -229,29 +228,28 @@ public class ASTUtils {
 		Element enclosing = member.getEnclosingElement();
 		if(enclosing instanceof TypeElement || enclosing instanceof PackageElement) {
 			if(!isAccessibleFrom(enclosing, from, env)) {
-				return false; // enclosing type not visible => member not visible
+				return false; // enclosing type not visible = member not visible
 			}
 		} else { // only types and packages may have externally visible children
 			return false;
 		}
 
-		Set<Modifier> mods = member.getModifiers();
-		if(mods.contains(Modifier.PUBLIC)) { // public is always visible
-			return true;
+		Modifier visibilityMod = getVisibilityModifier(member);
+		if(Modifier.PUBLIC.equals(visibilityMod)) {
+			return true; // always visible
 		}
 
 		PackageElement memberPkg = env.getElementUtils().getPackageOf(member);
 		PackageElement fromPkg = env.getElementUtils().getPackageOf(from);
 
-		// private is only visible if they are in the same top-level non-package
-		if(mods.contains(Modifier.PRIVATE)) {
+		if(Modifier.PRIVATE.equals(visibilityMod)) {
+			// only if they are within the same class
 			return getTopLevel(enclosing).equals(getTopLevel(from));
 		}
 
-		// protected is visible in the same package or within a subclass
-		if(mods.contains(Modifier.PROTECTED)) {
+		if(Modifier.PROTECTED.equals(visibilityMod)) {
 			if(memberPkg.equals(fromPkg)) {
-				return true;
+				return true; // same package
 			}
 
 			if(enclosing instanceof TypeElement) {
@@ -272,8 +270,28 @@ public class ASTUtils {
 			return false;
 		}
 
-		// package-private
+		// package-private (only within the same package)
 		return memberPkg.equals(fromPkg);
+	}
+
+	/**
+	 * Returns the visibility modifier of the given element.
+	 * In this context, a return value of null implies "package-private".
+	 * @param elem the element to examine
+	 * @return the visibility modifier, or null if none was found
+	 * @since 0.9.8
+	 */
+	public static Modifier getVisibilityModifier(Element elem) {
+		Set<Modifier> mods = elem.getModifiers();
+		if(mods.contains(Modifier.PUBLIC)) {
+			return Modifier.PUBLIC;
+		} else if(mods.contains(Modifier.PROTECTED)) {
+			return Modifier.PROTECTED;
+		} else if(mods.contains(Modifier.PRIVATE)) {
+			return Modifier.PRIVATE;
+		} else {
+			return null;
+		}
 	}
 
 	/**

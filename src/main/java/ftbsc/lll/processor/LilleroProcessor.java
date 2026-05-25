@@ -292,22 +292,32 @@ public class LilleroProcessor extends AbstractProcessor {
 			if(!matchedFinders.containsKey(e))
 				throw ErrorReporter.orphan(e);
 
+		// list that contains finders that are stored as fields
+		// quite ugly, but it's the best i can think of right now
+		List<FinderInfo> fieldFinders = new ArrayList<>();
+
 		// register parameter finders or generate constructor initializers
 		for(FinderInfo info : matchedFinders.values()) {
 			if(info.proxy.getEnclosingElement() instanceof ExecutableElement) {
 				InjectorInfo injInfo = toGenerate.get((ExecutableElement) info.proxy.getEnclosingElement());
 				if(injInfo != null) {
+					injInfo.validateVisibility(this.options, info.targetStub); // params only need validate stubs
 					injInfo.finderParams.add(info);
 				} else {
 					throw ErrorReporter.orphan(info.proxy);
 				}
 			} else {
+				fieldFinders.add(info);
 				info.appendToMethodSpec(constructorBuilder, false, this.options);
 			}
 		}
 
 		// iterate over the map and generate the classes
 		for(InjectorInfo injInfo : toGenerate.values()) {
+			for(FinderInfo finderInfo : fieldFinders) { // validate visibility of field finders
+				injInfo.validateVisibility(this.options, finderInfo.proxy, finderInfo.targetStub);
+			}
+
 			MethodContainer target = injInfo.target;
 			TypeSpec injectorClass = TypeSpec.classBuilder(injInfo.name)
 				.addModifiers(Modifier.PUBLIC)

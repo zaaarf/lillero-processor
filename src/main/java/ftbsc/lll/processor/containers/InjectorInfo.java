@@ -7,14 +7,13 @@ import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.annotations.Injector;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
+import ftbsc.lll.processor.reporting.Reportable;
+import ftbsc.lll.processor.utils.ASTUtils;
 import ftbsc.lll.processor.utils.JavaPoetUtils;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Container for information about a class that is to be generated.
@@ -41,7 +40,7 @@ public class InjectorInfo {
 	public final String reason;
 
 	/**
-	 * The output packages.
+	 * The output package.
 	 */
 	public final String outputPackage;
 
@@ -87,7 +86,45 @@ public class InjectorInfo {
 			this.outputPackage = options.env.getElementUtils().getPackageOf(injector).toString();
 		}
 
+		this.validateVisibility(options, injector, targetStub);
+
 		this.target = MethodContainer.from(targetStub, targetAnn, null, options);
+	}
+
+
+	/**
+	 * Validates the visibility in the target package of the given elements.
+	 * Null elements are skipped and will NOT throw exceptions.
+	 * @param options the {@link ProcessorOptions} to be used
+	 * @param toValidate the elements to validate
+	 * @throws Reportable if it is not visible
+	 * @since 0.9.8
+	 */
+	public void validateVisibility(ProcessorOptions options, Element... toValidate) {
+		for(Element cur : toValidate) {
+			if(cur == null) {
+				continue;
+			}
+
+			Element top = ASTUtils.getTopLevel(cur);
+			boolean inDifferentPackage = this.outputPackage.equals(
+				options.env.getElementUtils().getPackageOf(cur).toString()
+			);
+
+			do {
+				Modifier curMod = ASTUtils.getVisibilityModifier(cur);
+				if(
+					Modifier.PUBLIC.equals(curMod)
+						|| (Modifier.PROTECTED.equals(curMod) && !(cur instanceof TypeElement))
+						|| (curMod == null && !inDifferentPackage)
+				) {
+					cur = cur.getEnclosingElement();
+					continue;
+				}
+
+				throw ErrorReporter.notVisible(cur);
+			} while(!cur.equals(top));
+		}
 	}
 
 	/**
