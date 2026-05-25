@@ -34,7 +34,7 @@ import static ftbsc.lll.processor.utils.JavaPoetUtils.*;
 public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * A {@link Set} of {@link String}s that will contain the fully qualified names
-	 * of the generated injector files.
+	 * of the IInjector files.
 	 */
 	public final Set<String> injectors = new HashSet<>();
 
@@ -103,14 +103,10 @@ public class LilleroProcessor extends AbstractProcessor {
 			}
 		}
 
-		if(options.fakeMixin != null && !this.injectors.isEmpty()) {
-			this.generateFakeMixinClass(options.fakeMixin);
-		}
+		this.generateFakeMixinClass();
+		this.generateServiceProvider();
 
-		if(!options.noServiceProvider && !this.injectors.isEmpty()) {
-			this.generateServiceProvider();
-			return true;
-		} else return false;
+		return !this.injectors.isEmpty();
 	}
 
 	/**
@@ -349,13 +345,52 @@ public class LilleroProcessor extends AbstractProcessor {
 	/**
 	 * Generates a fake no-op Mixin to ensure that all the classes that need transformations
 	 * are registered to require them in Mixin environments.
-	 * @param fqn the fully-qualified name of the class
 	 * @since 0.8.2
 	 */
-	public void generateFakeMixinClass(String fqn) {
-		int lastPeriod = fqn.lastIndexOf('.');
-		String pkg = fqn.substring(0, Math.max(0, lastPeriod));
-		String clazz = fqn.substring(lastPeriod + 1);
+	public void generateFakeMixinClass() {
+		if(this.options.fakeMixin == null || this.injectors.isEmpty()) {
+			return;
+		}
+
+		int lastPeriod = options.fakeMixin.lastIndexOf('.');
+		String pkg = lastPeriod >= 0
+			? options.fakeMixin.substring(0, lastPeriod)
+			: "";
+		String clazz = options.fakeMixin.substring(lastPeriod + 1);
+
+		// validate mixin-specific requirements
+		// these are emitted as warnings because they technically do not impede the processor's functioning,
+		// but rather indicate a problem with the framework that will consume these
+
+		// validate that all injectors are in the same package as the mixin plugin
+		for(String injFQN : this.injectors) {
+			int injLastPeriod = injFQN.lastIndexOf('.');
+			String injPkg = injLastPeriod >= 0
+				? options.fakeMixin.substring(0, injLastPeriod)
+				: "";
+			if(!injPkg.equals(pkg)) {
+				this.processingEnv.getMessager().printMessage(
+					Diagnostic.Kind.WARNING,
+					String.format(
+						"[Lillero] Generated injector %s was not in the same package as the fake Mixin class (%s), this may cause problems!",
+						injFQN,
+						options.fakeMixin
+					)
+				);
+			}
+		}
+
+		// validate that the mixin package does not currently exist
+		PackageElement pkgElem = this.processingEnv.getElementUtils().getPackageElement(pkg);
+		if(pkgElem != null && !pkgElem.getEnclosedElements().isEmpty()) {
+			this.processingEnv.getMessager().printMessage(
+				Diagnostic.Kind.WARNING,
+				String.format(
+					"[Lillero] Fake Mixin class (%s) was put in an existing package, this may cause problems trying to access other classes within it!",
+					options.fakeMixin
+				)
+			);
+		}
 
 		// generate real mixin
 		AnnotationSpec.Builder mixinAnn = AnnotationSpec.builder(ClassName.get(
@@ -390,6 +425,10 @@ public class LilleroProcessor extends AbstractProcessor {
 	 * Generates the Service Provider file for the generated injectors.
 	 */
 	public void generateServiceProvider() {
+		if(this.options.noServiceProvider || this.injectors.isEmpty()) {
+			return;
+		}
+
 		try {
 			FileObject serviceProvider = this.processingEnv.getFiler().createResource(
 				StandardLocation.CLASS_OUTPUT,

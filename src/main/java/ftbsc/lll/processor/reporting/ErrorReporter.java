@@ -188,7 +188,12 @@ public class ErrorReporter {
 		return notFound(null, type, name, null, parent);
 	}
 
-	private static String buildPath(Element element) {
+	/**
+	 * Builds the path of the element as a string in a standardised way.
+	 * @param element the element to build the path for
+	 * @return the built path
+	 */
+	public static String buildPath(Element element) {
 		ArrayDeque<String> name = new ArrayDeque<>();
 		Element cur = element;
 		while(!(cur instanceof QualifiedNameable)) {
