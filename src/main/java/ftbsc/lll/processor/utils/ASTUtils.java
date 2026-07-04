@@ -16,6 +16,7 @@ import javax.lang.model.type.*;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -338,11 +339,36 @@ public class ASTUtils {
 			}
 		}
 
+		// ugly but manages to keep a pretty complicated logic simple
+		Deque<TypeMirror> alsoVisit = new LinkedBlockingDeque<>();
+		Set<TypeMirror> visited = new HashSet<>();
+		boolean checkingInterfaces = false;
+
 		ClassContainer parentCursor = parent;
 		while(true) {
 			Element found = findMember0(parentCursor, name, descr, strict, field, !inherited, options.env);
 			if(found == null) {
+				if(checkingInterfaces && !alsoVisit.isEmpty()) {
+					TypeMirror itf = alsoVisit.pop();
+					if(visited.contains(itf)) {
+						continue;
+					}
+
+					visited.add(itf); // prevent duplicates
+
+					TypeElement elem = (TypeElement) options.env.getTypeUtils().asElement(itf);
+					alsoVisit.addAll(elem.getInterfaces());
+					parentCursor = ClassContainer.describe(elem, options);
+
+					continue;
+				}
+
 				if(!parentCursor.elem.getSuperclass().getKind().equals(TypeKind.DECLARED)) {
+					if(!checkingInterfaces) {
+						checkingInterfaces = true;
+						continue;
+					}
+
 					throw ErrorReporter.notFound(
 						"(possibly inherited)",
 						field ? MemberType.FIELD : MemberType.METHOD,
@@ -352,6 +378,7 @@ public class ASTUtils {
 					);
 				}
 
+				alsoVisit.addAll(parentCursor.elem.getInterfaces());
 				parentCursor = ClassContainer.describe(
 					(TypeElement) options.env.getTypeUtils().asElement(parentCursor.elem.getSuperclass()),
 					options
