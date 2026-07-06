@@ -2,7 +2,6 @@ package ftbsc.lll.processor.containers;
 
 import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.ProcessorOptions;
@@ -11,9 +10,6 @@ import ftbsc.lll.processor.reporting.Reportable;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 import static ftbsc.lll.processor.utils.ASTUtils.*;
 
@@ -67,7 +63,6 @@ public class MethodContainer {
 	 * @param strict whether the matching should be strict (see {@link Target#strict()} for more info)
 	 * @param inherited whether to match implicitly inherited methods (see {@link Find#inherited()} for more info)
 	 * @param bridge whether the "bridge" should be matched instead (see {@link Target#bridge()} for more info)
-	 * @param overriddenStub a stub of the method this is supposedly overriding, may be null
 	 * @param options the {@link ProcessorOptions} to be used
 	 */
 	private MethodContainer(
@@ -78,7 +73,6 @@ public class MethodContainer {
 		boolean strict,
 		boolean bridge,
 		boolean inherited,
-		ExecutableElement overriddenStub,
 		ProcessorOptions options
 	) {
 		this.parent = parent;
@@ -110,32 +104,10 @@ public class MethodContainer {
 		// since there is no real drawback in being slightly wasteful here
 		if(
 			this.parent.elem != null
-				&& (overriddenStub != null || !options.mapper.hasMethod(parent.name, name, descriptor))
-				&& (this.elem == null ^ overriddenStub == null)
+				&& !options.mapper.hasMethod(parent.name, name, descriptor)
+				&& this.elem != null
 		) {
-			// if the Overridden annotation specified a signature, use it, otherwise try to figure it out
-			ExecutableElement top;
-			if(overriddenStub != null) {
-				Overridden o = overriddenStub.getAnnotation(Overridden.class);
-				top = (ExecutableElement) findMember(
-					ClassContainer.from(
-						o,
-						Overridden::parent,
-						o.parentFqn(),
-						o.parentInner(),
-						options
-					),
-					overriddenStub.getSimpleName().toString(),
-					o.strict() ? descriptorFromExecutableElement(overriddenStub, options.env) : null,
-					o.strict(),
-					inherited,
-					false,
-					options
-				);
-			} else {
-				top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
-			}
-
+			ExecutableElement top = findOverriddenMethod(this.parent.elem, this.elem, options.env);
 			this.nameMapped = options.mapper.mapMethodName(
 				internalNameFromType(top.getEnclosingElement().asType(), options.env),
 				top.getSimpleName().toString(),
@@ -180,38 +152,7 @@ public class MethodContainer {
 			t.strict(),
 			t.bridge(),
 			f != null && f.inherited(),
-			findOverriddenStub(stub),
 			opts
 		);
-	}
-
-	/**
-	 * Find the associated {@link Overridden} stub, if present.
-	 * @param stub the stub to look for info
-	 * @return the {@link Overridden} stub, or null if not found
-	 */
-	private static ExecutableElement findOverriddenStub(ExecutableElement stub) {
-		List<ExecutableElement> elements = stub.getEnclosingElement().getEnclosedElements().stream()
-			.filter(e -> e instanceof ExecutableElement)
-			.map(e -> (ExecutableElement) e)
-			.filter(e -> {
-				if(e.getParameters().size() != stub.getParameters().size()) return false;
-				Overridden ann = e.getAnnotation(Overridden.class);
-				if(ann == null) return false;
-
-				CharSequence nameLookingFor = ann.by().isEmpty()
-					? stub.getSimpleName()
-					: ann.by();
-				return stub.getSimpleName().equals(nameLookingFor);
-			}).collect(Collectors.toList());
-
-		switch(elements.size()) {
-			case 0:
-				return null;
-			case 1:
-				return elements.get(0);
-			default:
-				throw ErrorReporter.ambiguousOverridden(stub);
-		}
 	}
 }

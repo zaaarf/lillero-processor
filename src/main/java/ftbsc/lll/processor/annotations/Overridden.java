@@ -12,7 +12,15 @@ import java.lang.annotation.RetentionPolicy;
  * By default, this will be used for any method annotated with {@link Target} with
  * the same name present in the same class.
  * @since 0.8.0
+ * @deprecated As far as I can tell, this API has effectively been rendered obsolete
+ *             with {@link Find#inherited()} being introduced, to the point where I
+ *             no longer have a use for this in my own projects.
+ *             Will be removed fully in the next minor version. If it turns out that
+ *             there was still a use case for it, I'll reintroduce something similar,
+ *             hopefully with a slightly better API.
+ *             As of 0.9.9, this is a no-op.
  */
+@Deprecated
 @Retention(RetentionPolicy.CLASS)
 @java.lang.annotation.Target(ElementType.METHOD)
 public @interface Overridden {

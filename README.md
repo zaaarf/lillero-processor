@@ -150,8 +150,8 @@ Most if not all of this (although I have not tested it) should apply to local cl
 
 ### Unavailable classes
 Sometimes, you may want to patch a class that is unavailable in the current environment while still benefiting from most
-of the other pros of the processor. Every time you need to reference a class in an annotation (`@Patch`, twice in
-`@Find` and another time in `@Overridden`) there is also a `fqn()` parameter that takes in a string available to use.
+of the other pros of the processor. Every time you need to reference a class in an annotation (`@Patch`, `@Find`) there
+is also a `fqn()` parameter that takes in a string available to use. 
 You may specify the fully-qualified name manually there, instead of using a class object.
 
 An attempt will _still_ be made to validate the given FQN and lookup the class; if not found, a warning will be printed,
@@ -187,30 +187,6 @@ due to concerns about maintainability.
 
 Multiple formats are supported; the better one is probably `tinyv2`, but see the relevant project's README for more
 information.
-
-#### Limitations
-Many mapping formats like to "trim" their contents by not repeating information about overriding methods. In general,
-when failing to find a perfect match in the mappings, Lillero will *attempt* to find its way up to the top-level method,
-to compensate for that.
-
-However, it *may* fail find its way up the tree in particularly complex cases of chained type erasure, or when using
-particularly uncooperative mapping formats. To mitigate these rare occurrences, you can use `@Overridden`, which
-allows the user to write a stub for the top-level parent (thus specifying the signature of the method which will
-actually carry the obfuscation information).
-
-```java
-@Overridden(parent = IGenericInterface.class)
-abstract<T extends SomeClass> void someMethod(T input);
-
-@Target(of = "someInjector")
-abstract<T extends SubClassOfSomeClass> void someMethod(T input);
-```
-
-`@Overidden` will know what `@Target` it's aimed at by the name; if that proves not enough for your case, a `by`
-field allows you to customize that (obviously, combined with `@Target`'s `methodName`, which it will **ignore**). It
-has an obligatory `parent` field, and a number of optional ones that you should already be familiar with.
-
-The base method will be unaffected by `@Overridden` for all purposes except obfuscation of the name.
 
 ### Mixin support
 If you want to use [Lillero-mixin](https://github.com/zaaarf/lillero-mixin) in your project, the processor can generate

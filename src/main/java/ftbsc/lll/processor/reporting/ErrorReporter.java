@@ -1,7 +1,6 @@
 package ftbsc.lll.processor.reporting;
 
 import ftbsc.lll.processor.annotations.Find;
-import ftbsc.lll.processor.annotations.Overridden;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.containers.ClassContainer;
 import ftbsc.lll.processor.utils.ASTUtils;
@@ -68,18 +67,6 @@ public class ErrorReporter {
 	 */
 	public static Reportable orphan(Element element) {
 		return new Reportable("Could not find a valid target for element %s!", buildPath(element));
-	}
-
-	/**
-	 * Reports an error due to there being multiple {@link Overridden} classes for the same stub.
-	 * @param stub the stub
-	 * @return the exception to throw
-	 */
-	public static Reportable ambiguousOverridden(ExecutableElement stub) {
-		return new Reportable(
-			"Found multiple @Overridden methods for stub %s!",
-			buildPath(stub)
-		);
 	}
 
 	/**
