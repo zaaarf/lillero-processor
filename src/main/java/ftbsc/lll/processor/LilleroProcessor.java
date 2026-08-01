@@ -245,8 +245,8 @@ public class LilleroProcessor extends AbstractProcessor {
 		constructorBuilder.addModifiers(Modifier.PUBLIC);
 
 		// these are needed to generate the class later (and for validation)
-		Map<ExecutableElement, InjectorInfo> toGenerate = new HashMap<>();
-		Map<VariableElement, FinderInfo> matchedFinders = new HashMap<>();
+		Map<ExecutableElement, Set<InjectorInfo>> toGenerate = new HashMap<>();
+		Map<VariableElement, Set<FinderInfo>> matchedFinders = new HashMap<>();
 
 		int injectorNumber = 0;
 		for(ExecutableElement tg : targets) {
@@ -262,10 +262,10 @@ public class LilleroProcessor extends AbstractProcessor {
 						this.getProcessorOptions()
 					);
 
-					toGenerate.put(info.injector, info);
+					toGenerate.computeIfAbsent(info.injector, k -> new HashSet<>()).add(info);
 				} else if(matched instanceof VariableElement) { // matched a finder!
 					FinderInfo info = new FinderInfo(cl, (VariableElement) matched, tg, targetAnn);
-					matchedFinders.put(info.proxy, info);
+					matchedFinders.computeIfAbsent(info.proxy, k -> new HashSet<>()).add(info);
 				}
 			}
 		}
@@ -274,9 +274,9 @@ public class LilleroProcessor extends AbstractProcessor {
 		for(VariableElement proxyVar : finders) {
 			ProxyType type = getProxyType(proxyVar, this.options);
 			if(type == ProxyType.TYPE) {
-				matchedFinders.put(proxyVar, new FinderInfo(cl, proxyVar, null, null));
+				matchedFinders.computeIfAbsent(proxyVar, k -> new HashSet<>()).add(new FinderInfo(cl, proxyVar, null, null));
 			} else if(type == ProxyType.FIELD) {
-				matchedFinders.put(proxyVar, new FinderInfo(cl, proxyVar, null, null));
+				matchedFinders.computeIfAbsent(proxyVar, k -> new HashSet<>()).add(new FinderInfo(cl, proxyVar, null, null));
 			}
 		}
 
@@ -293,52 +293,58 @@ public class LilleroProcessor extends AbstractProcessor {
 		List<FinderInfo> fieldFinders = new ArrayList<>();
 
 		// register parameter finders or generate constructor initializers
-		for(FinderInfo info : matchedFinders.values()) {
-			if(info.proxy.getEnclosingElement() instanceof ExecutableElement) {
-				InjectorInfo injInfo = toGenerate.get((ExecutableElement) info.proxy.getEnclosingElement());
-				if(injInfo != null) {
-					injInfo.validateVisibility(this.options, info.targetStub); // params only need validate stubs
-					injInfo.finderParams.add(info);
+		for(Set<FinderInfo> set : matchedFinders.values()) {
+			for(FinderInfo info : set) {
+				if(info.proxy.getEnclosingElement() instanceof ExecutableElement) {
+					Set<InjectorInfo> injSet = toGenerate.get((ExecutableElement) info.proxy.getEnclosingElement());
+					for(InjectorInfo injInfo : injSet) {
+						if(injInfo != null) {
+							injInfo.validateVisibility(this.options, info.targetStub); // params only need validate stubs
+							injInfo.finderParams.add(info);
+						} else {
+							throw ErrorReporter.orphan(info.proxy);
+						}
+					}
 				} else {
-					throw ErrorReporter.orphan(info.proxy);
+					fieldFinders.add(info);
+					info.appendToMethodSpec(constructorBuilder, false, this.options);
 				}
-			} else {
-				fieldFinders.add(info);
-				info.appendToMethodSpec(constructorBuilder, false, this.options);
 			}
 		}
 
 		// iterate over the map and generate the classes
-		for(InjectorInfo injInfo : toGenerate.values()) {
-			for(FinderInfo finderInfo : fieldFinders) { // validate visibility of field finders
-				injInfo.validateVisibility(this.options, finderInfo.proxy, finderInfo.targetStub);
+		for(Set<InjectorInfo> set : toGenerate.values()) {
+			for(InjectorInfo injInfo : set) {
+				for(FinderInfo finderInfo : fieldFinders) { // validate visibility of field finders
+					injInfo.validateVisibility(this.options, finderInfo.proxy, finderInfo.targetStub);
+				}
+
+				MethodContainer target = injInfo.target;
+				TypeSpec injectorClass = TypeSpec.classBuilder(injInfo.name)
+					.addModifiers(Modifier.PUBLIC)
+					.superclass(cl.asType())
+					.addSuperinterface(ClassName.get(IInjector.class))
+					.addMethod(constructorBuilder.build())
+					.addMethod(buildStringReturnMethod("name", injInfo.name))
+					.addMethod(buildStringReturnMethod("reason", injInfo.reason))
+					.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata
+						? targetClass.nameMapped.replace('/', '.')
+						: targetClass.name.replace('/', '.')))
+					.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata
+						? target.nameMapped : target.name))
+					.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata
+						? target.descriptorMapped : target.descriptor))
+					.addMethods(generateDummies(cl))
+					.addMethod(injInfo.generateInjector(this.options))
+					.build();
+
+				this.injectors.add(writeClass(
+					this.processingEnv,
+					injInfo.outputPackage,
+					injInfo.name,
+					injectorClass
+				));
 			}
-
-			MethodContainer target = injInfo.target;
-			TypeSpec injectorClass = TypeSpec.classBuilder(injInfo.name)
-				.addModifiers(Modifier.PUBLIC)
-				.superclass(cl.asType())
-				.addSuperinterface(ClassName.get(IInjector.class))
-				.addMethod(constructorBuilder.build())
-				.addMethod(buildStringReturnMethod("name", injInfo.name))
-				.addMethod(buildStringReturnMethod("reason", injInfo.reason))
-				.addMethod(buildStringReturnMethod("targetClass", this.getProcessorOptions().obfuscateInjectorMetadata
-					? targetClass.nameMapped.replace('/', '.')
-					: targetClass.name.replace('/', '.')))
-				.addMethod(buildStringReturnMethod("methodName", this.getProcessorOptions().obfuscateInjectorMetadata
-					? target.nameMapped : target.name))
-				.addMethod(buildStringReturnMethod("methodDesc", this.getProcessorOptions().obfuscateInjectorMetadata
-					? target.descriptorMapped : target.descriptor))
-				.addMethods(generateDummies(cl))
-				.addMethod(injInfo.generateInjector(this.options))
-				.build();
-
-			this.injectors.add(writeClass(
-				this.processingEnv,
-				injInfo.outputPackage,
-				injInfo.name,
-				injectorClass
-			));
 		}
 	}
 
