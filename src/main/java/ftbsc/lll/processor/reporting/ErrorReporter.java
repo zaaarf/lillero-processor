@@ -23,7 +23,7 @@ public class ErrorReporter {
 	 * @return the exception to throw
 	 */
 	public static Reportable notAProxy(VariableElement element) {
-		return new Reportable("Annotated element %s does is not a proxy!", buildPath(element));
+		return new Reportable("Annotated element %s is not a proxy!", buildPath(element));
 	}
 
 	/**
