@@ -323,7 +323,7 @@ public class LilleroProcessor extends AbstractProcessor {
 				TypeSpec injectorClass = TypeSpec.classBuilder(injInfo.name)
 					.addModifiers(Modifier.PUBLIC)
 					.superclass(cl.asType())
-					.addSuperinterface(ClassName.get(IInjector.class))
+					.addSuperinterface(opts.resolveLilleroType("IInjector"))
 					.addMethod(constructorBuilder.build())
 					.addMethod(buildStringReturnMethod("name", injInfo.name))
 					.addMethod(buildStringReturnMethod("reason", injInfo.reason))

@@ -6,9 +6,6 @@ import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Patch;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.proxies.ProxyType;
-import ftbsc.lll.proxies.impl.FieldProxy;
-import ftbsc.lll.proxies.impl.MethodProxy;
-import ftbsc.lll.proxies.impl.TypeProxy;
 
 import javax.lang.model.element.*;
 
@@ -84,9 +81,9 @@ public class FinderInfo {
 			if(local) {
 				methodBuilder.addStatement(
 					"$T $L = $T.from($S, 0, $L)",
-					TypeProxy.class,
+					options.resolveLilleroType("proxies.impl.TypeProxy"),
 					this.proxy.getSimpleName().toString(),
-					TypeProxy.class,
+					options.resolveLilleroType("proxies.impl.TypeProxy"),
 					clazz.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
@@ -94,7 +91,7 @@ public class FinderInfo {
 				methodBuilder.addStatement(
 					"super.$L = $T.from($S, 0, $L)",
 					this.proxy.getSimpleName().toString(),
-					TypeProxy.class,
+					options.resolveLilleroType("proxies.impl.TypeProxy"),
 					clazz.nameMapped.replace('/', '.'), // use obf name, at runtime it will be obfuscated
 					clazz.elem == null ? 0 : mapModifiers(clazz.elem.getModifiers())
 				);
@@ -126,9 +123,13 @@ public class FinderInfo {
 
 		// initialize builder
 		methodBuilder.addStatement("$T $L = $T.builder($S)",
-			isMethod ? MethodProxy.Builder.class : FieldProxy.Builder.class,
+			isMethod
+				? options.resolveLilleroType("proxies.impl.MethodProxy.Builder") // MethodProxy.Builder.class
+				: options.resolveLilleroType("proxies.impl.FieldProxy.Builder"), // FieldProxy.Builder.class,
 			builderName, //variable name is always unique by definition
-			isMethod ? MethodProxy.class : FieldProxy.class,
+			isMethod
+				? options.resolveLilleroType("proxies.impl.MethodProxy")
+				: options.resolveLilleroType("proxies.impl.FieldProxy"),
 			nameObf
 		);
 
@@ -158,7 +159,9 @@ public class FinderInfo {
 		if(local) {
 			methodBuilder.addStatement(
 				"$T $L = $L.build()",
-				isMethod ? MethodProxy.class : FieldProxy.class,
+				isMethod
+					? options.resolveLilleroType("proxies.impl.MethodProxy")
+					: options.resolveLilleroType("proxies.impl.FieldProxy"),
 				this.proxy.getSimpleName().toString(),
 				builderName
 			);

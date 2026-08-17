@@ -1,6 +1,8 @@
 package ftbsc.lll.processor;
 
+import com.squareup.javapoet.ClassName;
 import ftbsc.lll.IInjector;
+import ftbsc.lll.processor.reporting.ErrorReporter;
 import ftbsc.lll.processor.utils.Mapper;
 import net.fabricmc.mappingio.MappingReader;
 import net.fabricmc.mappingio.tree.MappingTreeView;
@@ -8,6 +10,7 @@ import net.fabricmc.mappingio.tree.MemoryMappingTree;
 import net.fabricmc.mappingio.tree.VisitableMappingTree;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import java.io.*;
 import java.net.URI;
@@ -185,5 +188,9 @@ public class ProcessorOptions {
 		} catch(NumberFormatException ignored) {
 			return Boolean.parseBoolean(arg);
 		}
+	}
+
+	public ClassName resolveLilleroType(String partialName) {
+		return ClassName.bestGuess(this.apiPackage + "." + partialName);
 	}
 }

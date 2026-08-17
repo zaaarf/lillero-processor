@@ -1,5 +1,6 @@
 package ftbsc.lll.processor.reporting;
 
+import ftbsc.lll.processor.ProcessorOptions;
 import ftbsc.lll.processor.annotations.Find;
 import ftbsc.lll.processor.annotations.Target;
 import ftbsc.lll.processor.containers.ClassContainer;
@@ -147,7 +148,7 @@ public class ErrorReporter {
 	public static Reportable notVisible(Element element) {
 		Modifier visibility = ASTUtils.getVisibilityModifier(element);
 		return new Reportable(
-			"Element %s has visibility %s, which is not accessible from the given output package!!",
+			"Element %s has visibility %s, which is not accessible from the given output package!",
 			buildPath(element),
 			visibility != null ? element.toString().toLowerCase() : "package-private"
 		);
