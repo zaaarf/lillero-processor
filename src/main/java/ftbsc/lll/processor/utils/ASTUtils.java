@@ -13,6 +13,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -253,26 +254,50 @@ public class ASTUtils {
 				return true; // same package
 			}
 
-			if(enclosing instanceof TypeElement) {
-				TypeMirror enclosingType = enclosing.asType();
-				TypeElement cursor = from;
-				while(cursor != null) {
-					if(env.getTypeUtils().isSubtype(cursor.asType(), enclosingType)) {
-						// either TypeMirror is a subtype or is within a subtype
-						return true;
-					}
+			if(!(enclosing instanceof TypeElement)) {
+				return false; // a package may not enclose a protected member
+			}
 
-					Element parent = cursor.getEnclosingElement();
-					cursor = (parent instanceof TypeElement)
-						? (TypeElement) parent
-						: null;
+			// constructors don't count
+			if(ElementKind.CONSTRUCTOR.equals(member.getKind())) {
+				return false;
+			}
+
+			Types typeUtils = env.getTypeUtils();
+
+			// raw subtype check would fail for every subclass of a generic type
+			TypeMirror enclosingType = typeUtils.erasure(enclosing.asType());
+			for(TypeElement cursor = from; cursor != null; cursor = enclosingTypeOf(cursor)) {
+				if(typeUtils.isSubtype(typeUtils.erasure(cursor.asType()), enclosingType)) {
+					// either the type is a subtype or it is within a subtype
+					return true;
 				}
 			}
+
 			return false;
 		}
 
 		// package-private (only within the same package)
 		return memberPkg.equals(fromPkg);
+	}
+
+
+	/**
+	 * Finds the innermost {@link TypeElement} enclosing a given {@link Element}, skipping
+	 * over any non-type elements such as the methods enclosing local and anonymous classes.
+	 * @param element the {@link Element} to start from
+	 * @return the enclosing {@link TypeElement}, or null if the element is top level
+	 */
+	private static TypeElement enclosingTypeOf(Element element) {
+		Element cursor = element.getEnclosingElement();
+		while(cursor != null && !(cursor instanceof TypeElement)) {
+			if(cursor instanceof PackageElement) {
+				return null; // reached the top without finding a type
+			}
+
+			cursor = cursor.getEnclosingElement();
+		}
+		return (TypeElement) cursor;
 	}
 
 	/**
